@@ -5,6 +5,23 @@ All notable changes to Quotio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-29
+
+### Added
+
+- **Standalone Quota Mode**: View quota and accounts without running the proxy server - perfect for quick checks
+- **Mode Switcher**: Responsive toggle in sidebar to switch between Full and Quota-Only modes
+- **Trae Provider**: Support for Trae AI coding agent with quota tracking
+
+### Changed
+
+- **Menu Bar Redesign**: Provider-first layout with improved Liquid Glass compatibility
+- **Menu Bar Animation**: Use Timer-based rotation for reliable refresh animation
+
+### Fixed
+
+- **Cursor SQLite**: Use immutable mode to avoid WAL file lock errors
+
 ## [0.2.3] - 2025-12-28
 
 ### Fixed
