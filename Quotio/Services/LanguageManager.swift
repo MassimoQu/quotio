@@ -662,7 +662,6 @@ struct LocalizedStrings {
         "quota.allModels": [.english: "All Models", .vietnamese: "Tất cả model", .chinese: "所有模型", .french: "Tous les modèles"],
         "quota.limitReached": [.english: "Limit Reached", .vietnamese: "Đã đạt giới hạn", .chinese: "已达上限", .french: "Limite atteinte"],
         "quota.usage": [.english: "Usage", .vietnamese: "Sử dụng", .chinese: "使用量", .french: "Utilisation"],
-        "quota.used": [.english: "used", .vietnamese: "đã dùng", .chinese: "已用", .french: "utilisé"],
         
         // Settings
         "settings.appDescription": [.english: "CLIProxyAPI GUI Wrapper", .vietnamese: "Giao diện quản lý CLIProxyAPI", .chinese: "CLIProxyAPI 图形界面", .french: "Interface graphique CLIProxyAPI"],
