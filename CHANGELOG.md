@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
 
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
+
 ## [0.4.3-beta-1] - 2026-01-03
 
 ## [0.4.2] - 2026-01-02
@@ -43,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
 
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
+
 ## [0.4.1] - 2026-01-02
 
 ### Added
@@ -64,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
 
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
+
 ## [0.4.0] - 2026-01-01
 
 ### Added
@@ -76,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Proxy Idle Hang**: Prevent proxy process from hanging after extended idle periods (Issue #37, #53)
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
+
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
 
 ## [0.3.3] - 2025-12-31
 
@@ -94,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
 
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
+
 ## [0.3.2] - 2025-12-30
 
 ### Added
@@ -105,6 +115,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sparkle Update Loop**: Sync build number to match released version, preventing false update notifications
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
+
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
 
 ## [0.3.1] - 2025-12-30
 
@@ -143,6 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
 
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
+
 ## [0.3.0] - 2025-12-29
 
 ### Added
@@ -162,6 +176,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
 
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
+
 ## [0.2.3] - 2025-12-28
 
 ### Fixed
@@ -170,6 +186,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Menu Bar Auto-Focus**: Prevent auto-focus on buttons when panel opens (#13)
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
+
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
 
 ## [0.2.2] - 2025-12-27
 
@@ -182,6 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Race Condition**: Avoid race condition in stopProxy by capturing client reference before invalidation (#11)
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
+
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
 
 ### Added
 
@@ -203,6 +223,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dashboard UI**: Hide +Cursor button for non-manual-auth providers (#5)
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
+
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
 
 ### Changed
 
@@ -233,6 +255,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
 
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
+
 ## [0.1.3] - 2025-12-27
 
 ### Fixed
@@ -242,6 +266,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Proxy still running when quitting app from menu bar
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
+
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
 
 ### Added
 
@@ -289,6 +315,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI agent configurations matching CLIProxyAPI documentation
 
 - **ci**: merge appcast entries to make beta releases visible to updater (33e28a8)
+
+- **antigravity**: fix Use in IDE hanging on macOS 15.5+ (#81)
 
 ## [0.0.1] - 2025-12-20
 
