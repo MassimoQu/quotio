@@ -43,6 +43,12 @@ final class StatusBarMenuBuilder {
         if modeManager.isLocalProxyMode {
             menu.addItem(buildProxyInfoItem())
             menu.addItem(NSMenuItem.separator())
+            
+            // 2.5. Tunnel status (if proxy is running)
+            if viewModel.proxyManager.proxyStatus.running {
+                menu.addItem(buildTunnelItem())
+                menu.addItem(NSMenuItem.separator())
+            }
         }
         
         // 3. Provider picker + Account cards (separate items for submenu support)
@@ -148,6 +154,22 @@ final class StatusBarMenuBuilder {
             }
         )
         return viewItem(for: proxyView)
+    }
+    
+    private func buildTunnelItem() -> NSMenuItem {
+        let tunnelManager = TunnelManager.shared
+        let tunnelView = MenuTunnelView(
+            onToggle: { [weak viewModel] in
+                guard let viewModel = viewModel else { return }
+                Task {
+                    await tunnelManager.toggle(port: viewModel.proxyManager.port)
+                }
+            },
+            onCopyURL: {
+                tunnelManager.copyURLToClipboard()
+            }
+        )
+        return viewItem(for: tunnelView)
     }
     
     // MARK: - Account Card Item (with submenu for Antigravity)
@@ -902,6 +924,72 @@ private struct MenuBarActionButton: View {
         .buttonStyle(.plain)
         .disabled(isLoading)
         .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Menu Tunnel View
+
+private struct MenuTunnelView: View {
+    private let tunnelManager = TunnelManager.shared
+    let onToggle: () -> Void
+    let onCopyURL: () -> Void
+    
+    private var status: CloudflareTunnelStatus { tunnelManager.tunnelState.status }
+    private var publicURL: String? { tunnelManager.tunnelState.publicURL }
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Image(systemName: "globe")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Text("Cloudflare Tunnel")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                TunnelStatusBadge(status: status, compact: true)
+            }
+            
+            if status == .active, let url = publicURL {
+                HStack {
+                    Text(url)
+                        .font(.system(.caption, design: .monospaced))
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    Button(action: onCopyURL) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            
+            HStack {
+                Spacer()
+                
+                Button(action: onToggle) {
+                    Text(status == .active || status == .starting
+                         ? "tunnel.action.stop".localized()
+                         : "tunnel.action.start".localized())
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(status == .active ? .red : .blue)
+                .disabled(status == .starting || status == .stopping)
+            }
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
     }
 }
 

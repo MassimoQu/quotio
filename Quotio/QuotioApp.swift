@@ -214,10 +214,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private nonisolated(unsafe) var windowDidBecomeKeyObserver: NSObjectProtocol?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Register default values for UserDefaults
+        // Move orphan cleanup off main thread to avoid blocking app launch
+        DispatchQueue.global(qos: .utility).async {
+            TunnelManager.shared.cleanupOrphans()
+        }
+        
         UserDefaults.standard.register(defaults: [
-            "useBridgeMode": true,  // Enable two-layer proxy by default for connection stability
-            "showInDock": true      // Show in dock by default
+            "useBridgeMode": true,
+            "showInDock": true
         ])
         
         // Apply initial dock visibility based on saved preference
@@ -269,6 +273,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         CLIProxyManager.terminateProxyOnShutdown()
+        
+        // Use semaphore to ensure tunnel cleanup completes before app terminates
+        // with a timeout to prevent hanging termination
+        let semaphore = DispatchSemaphore(value: 0)
+        let cleanupTimeout: DispatchTime = .now() + .milliseconds(1500)
+        
+        Task { @MainActor in
+            await TunnelManager.shared.stopTunnel()
+            semaphore.signal()
+        }
+        
+        let result = semaphore.wait(timeout: cleanupTimeout)
+        if result == .timedOut {
+            // Fallback: force kill orphan processes if stopTunnel timed out
+            TunnelManager.shared.cleanupOrphans()
+            NSLog("[AppDelegate] Tunnel cleanup timed out, forced orphan cleanup")
+        }
     }
 
     private func handleWindowDidBecomeKey() {
