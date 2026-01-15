@@ -1,161 +1,352 @@
 # Swift Code Cleanup Plan
 
-**Created:** 2026-01-13  
+**Created:** 2026-01-13
+**Updated:** 2026-01-15
 **Branch:** feat/universal-provider-architecture  
-**Status:** Planning Complete - Awaiting CLI Proxy Production Readiness
+**Status:** Ready for Implementation - All TS equivalents ported
 
 ## Overview
 
-Migration plan to remove redundant Swift code after business logic has been ported to the TypeScript `quotio-cli`. This cleanup should only proceed **when the CLI proxy is production-ready**.
+Migration plan to remove redundant Swift code after business logic has been ported to the TypeScript `quotio-cli`. 
 
-### What Was Already Ported
+### Summary
 
-| CLI (TypeScript) | Swift Original | Lines |
-|------------------|----------------|-------|
-| `quotio-cli/src/services/format-converter.ts` | `Quotio/Services/Proxy/FallbackFormatConverter.swift` | 1305 |
-| `quotio-cli/src/services/quota-fetchers/kiro.ts` | `Quotio/Services/QuotaFetchers/KiroQuotaFetcher.swift` | 561 |
-| `quotio-cli/src/services/management-api.ts` | `Quotio/Services/ManagementAPIClient.swift` | - |
+| Category | Files | Lines | Status |
+|----------|-------|-------|--------|
+| Deprecated code (can delete) | 2 | 875 | Ready |
+| QuotaFetchers (TS ported) | 6 | 2,217 | Ready after migration |
+| FallbackFormatConverter | 1 | 63 | ✅ **Already simplified** (was 1,190) |
+| ProxyBridge (simplify) | 1 | ~40 lines removable | Ready after Phase 2 |
+| **Total potential cleanup** | **10 files** | **~3,195 lines** | |
+
+### Recent Progress (2026-01-15)
+
+**Commit e1ed27a** (`refactor(fallback): simplify fallback logic by removing format conversion`) completed Phase 3.4 early:
+- `FallbackFormatConverter.swift` reduced from 1,190 → 63 lines
+- Added `ModelType` enum to `FallbackModels.swift` for same-type-only fallback
+- Fallback now only works between models of same type (Claude→Claude, GPT→GPT, etc.)
+- Cross-format conversion logic removed - no longer needed
 
 ---
 
-## Phase 1: Preparation (HIGH Priority)
+## What Was Already Ported to TypeScript
 
-Verify CLI proxy has feature parity before any removal.
+All quota fetchers and format converter have been ported to `quotio-cli`:
+
+| CLI (TypeScript) | Swift Original | Swift Lines | TS Lines | Status |
+|------------------|----------------|-------------|----------|--------|
+| `format-converter.ts` | `FallbackFormatConverter.swift` | 63 | 1,306 | ⚠️ Swift simplified (error detection only) |
+| `quota-fetchers/kiro.ts` | `KiroQuotaFetcher.swift` | 519 | 560 | ✅ Ported + Tested |
+| `quota-fetchers/claude.ts` | `ClaudeCodeQuotaFetcher.swift` | 364 | 189 | ✅ Ported + Tested |
+| `quota-fetchers/copilot.ts` | `CopilotQuotaFetcher.swift` | 487 | 270 | ✅ Ported + Tested |
+| `quota-fetchers/openai.ts` | `OpenAIQuotaFetcher.swift` | 291 | 234 | ✅ Ported |
+| `quota-fetchers/gemini.ts` | `GeminiCLIQuotaFetcher.swift` | 186 | 107 | ✅ Ported |
+| `quota-fetchers/codex.ts` | `CodexCLIQuotaFetcher.swift` | 370 | 254 | ✅ Ported |
+| `quota-fetchers/antigravity.ts` | `AntigravityQuotaFetcher.swift` | 843 | 338 | ✅ Ported |
+| `quota-fetchers/cursor.ts` | `CursorQuotaFetcher.swift` | 406 | 284 | ✅ Ported (KEEP Swift) |
+| `quota-fetchers/trae.ts` | `TraeQuotaFetcher.swift` | 368 | 356 | ✅ Ported (KEEP Swift) |
+| `management-api.ts` | `ManagementAPIClient.swift` | 726 | 368 | ✅ Ported |
+
+---
+
+## Phase 1: Immediate Cleanup (Safe Deletions)
+
+Files that are already deprecated and have no/minimal dependencies.
+
+### 1.1 Delete `AppMode.swift` (149 lines)
+
+| Property | Value |
+|----------|-------|
+| File | `Quotio/Models/AppMode.swift` |
+| Status | `@available(*, deprecated)` |
+| Replacement | `OperatingMode.swift` |
+| Dependencies | Only referenced in `OperatingMode.swift` for backward compat |
+
+**Steps:**
+```bash
+# 1. Remove any imports/references in OperatingMode.swift
+# 2. Delete the file
+rm Quotio/Models/AppMode.swift
+# 3. Verify build
+xcodebuild -project Quotio.xcodeproj -scheme Quotio -configuration Debug build
+```
+
+### 1.2 Migrate `ManagementAPIClient` Usages (726 lines)
+
+| Property | Value |
+|----------|-------|
+| File | `Quotio/Services/ManagementAPIClient.swift` |
+| Status | `@available(*, deprecated)` |
+| Replacement | `DaemonIPCClient` |
+| Dependencies | 4 files still using it |
+
+**Files to migrate:**
+
+| File | Current Usage | Migrate To |
+|------|---------------|------------|
+| `ViewModels/LogsViewModel.swift:15,25` | `ManagementAPIClient` for logs | `DaemonIPCClient.fetchLogs()` |
+| `ViewModels/QuotaViewModel.swift:15,17,296,966` | `ManagementAPIClient` for remote mode | `DaemonIPCClient.remoteSetConfig()` |
+| `Views/Screens/SettingsScreen.swift:335,592` | Remote mode config | `DaemonProxyConfigService` |
+| `Models/ConnectionMode.swift:136` | Base URL extraction | Keep for remote mode display only |
+
+**Steps:**
+```swift
+// 1. In LogsViewModel.swift, replace:
+private var apiClient: ManagementAPIClient?
+// With:
+private let ipcClient = DaemonIPCClient.shared
+
+// 2. Replace API calls:
+// OLD: try await apiClient?.fetchLogs()
+// NEW: try await ipcClient.fetchLogs()
+
+// 3. After all migrations complete, delete ManagementAPIClient.swift
+```
+
+---
+
+## Phase 2: Move Fallback Logic to CLI (HIGH Priority)
+
+The fallback/retry logic currently lives in `ProxyBridge.swift` (930 lines). Move it to CLI for cross-platform support.
 
 | ID | Task | Status |
 |----|------|--------|
-| 1.1 | Verify `FallbackFormatConverter.ts` handles all 13 providers (OpenAI, Anthropic, Google formats) | [ ] |
-| 1.2 | Verify CLI proxy handles fallback trigger detection (429, 5xx, timeout) matching Swift behavior | [ ] |
-| 1.3 | Add integration tests for format conversion (OpenAI <-> Anthropic <-> Google) in quotio-cli | [ ] |
-| 1.4 | Add integration tests for KiroQuotaFetcher dual auth (Social + IdC) token refresh | [ ] |
-| 1.5 | Port remaining quota fetchers to TS: ClaudeCode, Copilot, OpenAI, Gemini, Codex, Antigravity | [ ] |
+| 2.1 | Add Virtual Model / fallback chain support to CLI proxy | [ ] |
+| 2.2 | Move fallback settings API from `FallbackSettingsManager.swift` to CLI IPC | [ ] |
+| 2.3 | Implement same-type retry logic in CLI (retry on 429/5xx) | [ ] |
+| 2.4 | Update `FallbackSettingsManager.swift` to sync with CLI config | [ ] |
+
+> **Note**: Format conversion is no longer needed - fallback only works between same model types (ModelType enum in FallbackModels.swift).
+
+**After Phase 2 completion, proceed to Phase 3.**
 
 ---
 
-## Phase 2: Move Fallback Logic from Swift to CLI (HIGH Priority)
+## Phase 3: Simplify ProxyBridge (MEDIUM Priority)
 
-The fallback/retry logic currently lives in `ProxyBridge.swift`. Move it to CLI for cross-platform support.
+Once CLI handles fallback, simplify `ProxyBridge.swift` from 930 lines to ~200 lines.
 
 | ID | Task | Status |
 |----|------|--------|
-| 2.1 | Add Virtual Model / fallback chain support to CLI proxy (currently in `ProxyBridge.swift`) | [ ] |
-| 2.2 | Move fallback settings API from `FallbackSettingsManager.swift` to CLI config endpoint | [ ] |
-| 2.3 | Implement cross-provider retry logic in CLI (retry with different provider on 429/5xx) | [ ] |
+| 3.1 | Remove `FallbackFormatConverter` usage from `ProxyBridge.swift` | [ ] |
+| 3.2 | Remove `FallbackContext` and fallback retry logic | [ ] |
+| 3.3 | Keep only TCP passthrough with `Connection: close` header | [ ] |
+| 3.4 | ~~Delete `FallbackFormatConverter.swift` (1,190 lines)~~ | ✅ **DONE** - reduced to 63 lines (error detection only) |
+| 3.5 | Update `RequestTracker` to consume metrics from CLI API | [ ] |
+
+> **Note**: Phase 3.4 completed early in commit `e1ed27a`. FallbackFormatConverter now only contains error detection logic (63 lines).
 
 ---
 
-## Phase 3: Refactor ProxyBridge to Thin Passthrough (MEDIUM Priority)
+## Phase 4: Delete QuotaFetchers (After Phase 1.2)
 
-Once CLI handles fallback, simplify `ProxyBridge.swift` to minimal TCP passthrough.
+After `QuotaViewModel` is migrated to use `DaemonIPCClient.fetchQuotas()`:
 
-| ID | Task | Status |
-|----|------|--------|
-| 3.1 | Remove `FallbackFormatConverter` usage from `ProxyBridge.swift` (CLI handles format conversion) | [ ] |
-| 3.2 | Remove fallback/retry logic from `ProxyBridge.swift` (CLI handles retries) | [ ] |
-| 3.3 | Keep `ProxyBridge.swift` as thin TCP passthrough with `Connection: close` header only | [ ] |
-| 3.4 | Update `RequestTracker` integration to consume metrics from CLI API instead of `ProxyBridge` | [ ] |
+| ID | File to Delete | Lines | Reason |
+|----|----------------|-------|--------|
+| 4.1 | `QuotaFetchers/KiroQuotaFetcher.swift` | 519 | TS equivalent: `kiro.ts` |
+| 4.2 | `QuotaFetchers/ClaudeCodeQuotaFetcher.swift` | 364 | TS equivalent: `claude.ts` |
+| 4.3 | `QuotaFetchers/CopilotQuotaFetcher.swift` | 487 | TS equivalent: `copilot.ts` |
+| 4.4 | `QuotaFetchers/OpenAIQuotaFetcher.swift` | 291 | TS equivalent: `openai.ts` |
+| 4.5 | `QuotaFetchers/GeminiCLIQuotaFetcher.swift` | 186 | TS equivalent: `gemini.ts` |
+| 4.6 | `QuotaFetchers/CodexCLIQuotaFetcher.swift` | 370 | TS equivalent: `codex.ts` |
+| **Total** | | **2,217** | |
 
----
+**Steps for each fetcher:**
+```bash
+# 1. Verify TS equivalent works via daemon
+cd quotio-cli && bun test
 
-## Phase 4: Delete Redundant Swift Files (LOW Priority)
+# 2. Update QuotaViewModel to use DaemonIPCClient
+# Replace: let result = await KiroQuotaFetcher.shared.fetch()
+# With: let result = try await DaemonIPCClient.shared.fetchQuotas(provider: "kiro")
 
-Only proceed after Phases 1-3 are verified working.
+# 3. Delete Swift file
+rm Quotio/Services/QuotaFetchers/KiroQuotaFetcher.swift
 
-| ID | File to Delete | Reason | Lines Saved |
-|----|----------------|--------|-------------|
-| 4.1 | `Quotio/Services/Proxy/FallbackFormatConverter.swift` | Logic now in CLI | ~1100 |
-| 4.2 | `Quotio/Services/QuotaFetchers/KiroQuotaFetcher.swift` | Ported to `kiro.ts` | ~300 |
-| 4.3 | `Quotio/Services/QuotaFetchers/ClaudeCodeQuotaFetcher.swift` | Once TS equivalent verified | ~200 |
-| 4.4 | `Quotio/Services/QuotaFetchers/CopilotQuotaFetcher.swift` | Once TS equivalent verified | ~150 |
-| 4.5 | `Quotio/Services/QuotaFetchers/OpenAIQuotaFetcher.swift` | Once TS equivalent verified | ~150 |
-| 4.6 | `Quotio/Services/QuotaFetchers/GeminiCLIQuotaFetcher.swift` | Once TS equivalent verified | ~100 |
-| 4.7 | `Quotio/Services/QuotaFetchers/CodexCLIQuotaFetcher.swift` | Once TS equivalent verified | ~100 |
-
-**Additional Changes:**
-- Update `QuotaViewModel.swift` to use CLI quota endpoints instead of local Swift fetchers
-
-**Estimated Total Deletion:** ~2100+ lines of Swift code
+# 4. Verify build
+xcodebuild -project Quotio.xcodeproj -scheme Quotio -configuration Debug build
+```
 
 ---
 
 ## Phase 5: Files to KEEP (DO NOT DELETE)
 
-These Swift files must remain - they handle macOS-specific functionality that cannot be moved to CLI.
+These Swift files must remain - they handle macOS-specific functionality.
+
+### Core Services (KEEP)
 
 | File | Reason |
 |------|--------|
-| `Quotio/Services/Proxy/CLIProxyManager.swift` | macOS process lifecycle, binary download, auth commands |
-| `Quotio/Services/Proxy/ProxyStorageManager.swift` | Versioned binary storage, symlinks, rollback support |
-| `Quotio/Services/ProxyBridge.swift` (thinned) | TCP passthrough with `Connection: close` header |
-| `Quotio/Services/QuotaFetchers/CursorQuotaFetcher.swift` | Reads local SQLite, macOS-specific, monitor-only |
-| `Quotio/Services/QuotaFetchers/TraeQuotaFetcher.swift` | Reads local JSON, macOS-specific, monitor-only |
-| `Quotio/Services/StatusBarManager.swift` | macOS menu bar integration |
-| `Quotio/Services/StatusBarMenuBuilder.swift` | NSMenu construction |
-| `Quotio/Services/NotificationManager.swift` | macOS notifications |
-| `Quotio/Services/FallbackSettingsManager.swift` | UI state management (may become thin wrapper) |
-| `Quotio/Services/Antigravity/*` | Complex macOS integration (Protobuf, DB, Process, Account) |
-| `Quotio/Services/AgentDetectionService.swift` | macOS filesystem scanning |
-| `Quotio/Services/AgentConfigurationService.swift` | macOS config file management |
-| All UI services | macOS GUI only |
+| `Daemon/DaemonIPCClient.swift` | IPC client - core communication layer |
+| `Daemon/DaemonManager.swift` | Daemon lifecycle management |
+| `Daemon/DaemonProxyService.swift` | Proxy operations via IPC |
+| `Daemon/DaemonQuotaService.swift` | Quota fetching via IPC |
+| `Daemon/DaemonAuthService.swift` | Auth management via IPC |
+| `Daemon/DaemonLogsService.swift` | Logs via IPC |
+| `Daemon/DaemonConfigService.swift` | Config via IPC |
+| `Daemon/DaemonProxyConfigService.swift` | Proxy config via IPC |
+| `Daemon/DaemonAPIKeysService.swift` | API keys via IPC |
+| `Daemon/IPCProtocol.swift` | IPC types and protocol |
+| `Proxy/CLIProxyManager.swift` | macOS process lifecycle, binary management |
+| `Proxy/ProxyStorageManager.swift` | Versioned binary storage, rollback |
+| `Proxy/ProxyBridge.swift` (thinned) | TCP passthrough only (~200 lines after cleanup) |
+| `Proxy/FallbackFormatConverter.swift` | Error detection only (63 lines) |
+| `KeychainService.swift` | macOS Keychain integration |
+| `StatusBarManager.swift` | macOS menu bar integration |
+| `StatusBarMenuBuilder.swift` | NSMenu construction |
+| `NotificationManager.swift` | macOS notifications |
+| `FallbackSettingsManager.swift` | UI state (becomes thin wrapper to CLI config) |
+| `AgentDetectionService.swift` | macOS filesystem scanning |
+| `AgentConfigurationService.swift` | macOS config file management |
+| `UniversalProviderService.swift` | Provider management |
+
+### QuotaFetchers to KEEP (macOS-specific)
+
+| File | Lines | Reason |
+|------|-------|--------|
+| `CursorQuotaFetcher.swift` | 406 | Reads local SQLite from Cursor app |
+| `TraeQuotaFetcher.swift` | 368 | Reads local JSON from Trae IDE |
+
+### Antigravity Suite (KEEP - 2,023 lines total)
+
+| File | Lines | Reason |
+|------|-------|--------|
+| `AntigravityQuotaFetcher.swift` | 843 | Complex quota + account management |
+| `AntigravityDatabaseService.swift` | 378 | SQLite DB injection |
+| `AntigravityProtobufHandler.swift` | 313 | Protobuf parsing |
+| `AntigravityAccountSwitcher.swift` | 283 | Account switching |
+| `AntigravityProcessManager.swift` | 206 | IDE process management |
 
 ---
 
 ## Phase 6: Final Verification (HIGH Priority)
 
-| ID | Test | Status |
-|----|------|--------|
-| 6.1 | E2E test: Start proxy via Quotio -> run AI agent -> verify request routing works | [ ] |
-| 6.2 | E2E test: Fallback scenario - primary provider 429 -> automatic retry to secondary | [ ] |
-| 6.3 | E2E test: Token refresh - expired Kiro token -> auto-refresh -> request succeeds | [ ] |
-| 6.4 | Verify Swift app builds without errors after deletions (`xcodebuild`) | [ ] |
-| 6.5 | Update `AGENTS.md` and documentation to reflect new architecture | [ ] |
+| ID | Test | Command | Status |
+|----|------|---------|--------|
+| 6.1 | CLI tests pass | `cd quotio-cli && bun test` | [ ] |
+| 6.2 | Swift app builds | `xcodebuild -scheme Quotio -configuration Debug build` | [ ] |
+| 6.3 | E2E: Proxy routing works | Manual test with AI agent | [ ] |
+| 6.4 | E2E: Fallback retry works | Trigger 429 → verify retry | [ ] |
+| 6.5 | E2E: Token refresh works | Expire Kiro token → verify refresh | [ ] |
+| 6.6 | ~~Update documentation~~ | ~~Fix ports in AGENTS.md~~ | ✅ Verified correct |
+
+---
+
+## Phase 7: Documentation Fixes
+
+**Status:** ✅ **VERIFIED CORRECT** (2026-01-15)
+
+The documentation accurately reflects the dual-port architecture:
+- **Port 8317** = ProxyBridge.swift (client-facing, what CLI agents connect to)
+- **Port 18317** = CLIProxyAPI Go binary (internal, ProxyBridge forwards here)
+
+| File | Line | Current Value | Status |
+|------|------|---------------|--------|
+| `AGENTS.md:85` | daemon → CLIProxyAPI | `18317` | ✅ Correct (internal) |
+| `AGENTS.md:212` | ProxyBridge.swift | `8317` | ✅ Correct (client-facing) |
+| `AGENTS.md:216` | CLIProxyAPI | `18317` | ✅ Correct (internal) |
+| `docs/daemon-migration-guide.md:14` | CLIProxyAPI | `18317` | ✅ Correct (internal) |
+
+**No changes needed.** Original plan had incorrect assumption about port usage.
 
 ---
 
 ## Dependency Graph
 
 ```
-Before Cleanup:
+BEFORE CLEANUP (Current State):
+
 CLIProxyManager
-├── ProxyBridge (TCP + Fallback + Format Conversion)
-│   ├── FallbackFormatConverter (1100 lines) ← DELETE
+├── ProxyBridge (930 lines: TCP + Fallback, simplified format handling)
+│   ├── FallbackFormatConverter (63 lines: error detection only)
 │   └── FallbackSettingsManager
 ├── ProxyStorageManager
-└── All QuotaFetchers (Swift) ← MOSTLY DELETE
+└── QuotaFetchers (Swift)
+    ├── KiroQuotaFetcher (519 lines) ← DELETE
+    ├── ClaudeCodeQuotaFetcher (364 lines) ← DELETE
+    ├── CopilotQuotaFetcher (487 lines) ← DELETE
+    ├── OpenAIQuotaFetcher (291 lines) ← DELETE
+    ├── GeminiCLIQuotaFetcher (186 lines) ← DELETE
+    ├── CodexCLIQuotaFetcher (370 lines) ← DELETE
+    ├── CursorQuotaFetcher (406 lines) ← KEEP
+    └── TraeQuotaFetcher (368 lines) ← KEEP
 
-After Cleanup:
+ViewModels
+├── QuotaViewModel
+│   └── ManagementAPIClient (726 lines) ← DELETE after migration
+└── LogsViewModel
+    └── ManagementAPIClient ← DELETE after migration
+
+Models
+├── AppMode.swift (149 lines) ← DELETE immediately
+└── FallbackModels.swift ← KEEP (has ModelType enum for same-type fallback)
+
+---
+
+AFTER CLEANUP (Target State):
+
 CLIProxyManager
-├── ProxyBridge (TCP passthrough only, ~200 lines)
+├── ProxyBridge (~200 lines: TCP passthrough only)
 ├── ProxyStorageManager
-├── CursorQuotaFetcher (monitor-only, KEEP)
-└── TraeQuotaFetcher (monitor-only, KEEP)
+└── DaemonIPCClient (IPC to quotio-cli)
 
-CLI Proxy (TypeScript):
-├── format-converter.ts (handles all format conversion)
-├── quota-fetchers/* (handles all provider quotas)
-└── routing + fallback logic
+QuotaFetchers (Swift - macOS only)
+├── CursorQuotaFetcher (KEEP - local SQLite)
+└── TraeQuotaFetcher (KEEP - local JSON)
+
+quotio-cli daemon (TypeScript):
+├── format-converter.ts (all format conversion - for future cross-type fallback if needed)
+├── quota-fetchers/* (all provider quotas via API)
+└── fallback/routing logic (same-type only)
 ```
+
+---
+
+## Implementation Timeline
+
+| Week | Phase | Tasks | Lines Removed |
+|------|-------|-------|---------------|
+| 1 | Phase 1 | Delete AppMode.swift, Migrate ManagementAPIClient | 875 |
+| 2 | Phase 4 | Delete 6 QuotaFetchers | 2,217 |
+| 3 | Phase 2-3 | Move fallback to CLI, Simplify ProxyBridge | ~40 |
+| 4 | Phase 6-7 | Testing, Documentation | 0 |
+| **Total** | | | **~3,132 lines** |
+
+> **Note**: Original estimate was ~5,052 lines. Reduced to ~3,132 because FallbackFormatConverter was already simplified (1,190 → 63 lines saved 1,127 lines early).
 
 ---
 
 ## Notes
 
-- **IDE Monitors** (Cursor, Trae) stay in Swift because they read local SQLite/JSON that's macOS-specific
+- **IDE Monitors** (Cursor, Trae) stay in Swift - they read local SQLite/JSON
 - **Antigravity suite** stays in Swift due to complex Protobuf DB injection and IDE process management
-- **FallbackSettingsManager** may become a thin wrapper that syncs UI state to CLI config
+- **FallbackSettingsManager** becomes thin wrapper syncing UI state to CLI config
+- **FallbackFormatConverter** already simplified to error detection only (63 lines) - keep in Swift
+- **ModelType enum** in FallbackModels.swift enforces same-type-only fallback (Claude→Claude, GPT→GPT, etc.)
 - Test thoroughly on real accounts before deleting any quota fetcher
+- Delete one file at a time and verify build after each deletion
 
 ---
 
 ## Commands Reference
 
 ```bash
-# Verify CLI builds
-cd quotio-cli && bun run lint && bun run build
+# Verify CLI tests pass
+cd quotio-cli && bun test
 
-# Verify Swift builds after changes
+# Verify CLI builds
+cd quotio-cli && bun run build
+
+# Verify Swift builds
 xcodebuild -project Quotio.xcodeproj -scheme Quotio -configuration Debug build
 
-# Run CLI tests (when added)
-cd quotio-cli && bun test
+# Check for remaining usages before deletion
+rg "KiroQuotaFetcher" Quotio/ --line-number
+
+# Delete a file safely
+git rm Quotio/Services/QuotaFetchers/KiroQuotaFetcher.swift
+
+# Verify no compile errors
+xcodebuild -project Quotio.xcodeproj -scheme Quotio -configuration Debug build 2>&1 | grep -E "error:|warning:"
 ```
