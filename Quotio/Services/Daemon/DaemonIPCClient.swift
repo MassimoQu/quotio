@@ -380,6 +380,10 @@ extension DaemonIPCClient {
     func fetchCopilotAvailableModels() async throws -> IPCCopilotAvailableModelsResult {
         try await call(.copilotAvailableModels)
     }
+    
+    func fetchStats() async throws -> IPCStatsGetResult {
+        try await call(.statsGet)
+    }
 }
 
 enum IPCClientError: LocalizedError {

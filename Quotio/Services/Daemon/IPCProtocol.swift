@@ -88,6 +88,9 @@ nonisolated enum IPCMethod: String, Sendable {
     case logsFetch = "logs.fetch"
     case logsClear = "logs.clear"
     
+    // Stats
+    case statsGet = "stats.get"
+    
     // Config
     case configGet = "config.get"
     case configSet = "config.set"
@@ -337,6 +340,29 @@ nonisolated struct IPCAuthAccount: Codable, Sendable {
     let email: String?
     let status: String
     let disabled: Bool
+    
+    func toAuthFile() -> AuthFile {
+        AuthFile(
+            id: id,
+            name: name,
+            provider: provider,
+            label: nil,
+            status: status,
+            statusMessage: nil,
+            disabled: disabled,
+            unavailable: false,
+            runtimeOnly: nil,
+            source: nil,
+            path: nil,
+            email: email,
+            accountType: nil,
+            account: nil,
+            authIndex: nil,
+            createdAt: nil,
+            updatedAt: nil,
+            lastRefresh: nil
+        )
+    }
 }
 
 nonisolated struct IPCConfigGetResult: Codable, Sendable {
@@ -523,6 +549,41 @@ nonisolated struct IPCCopilotAvailableModelsResult: Codable, Sendable {
     let success: Bool
     let modelIds: [String]
     let error: String?
+}
+
+// MARK: - Stats Types
+
+nonisolated struct IPCStatsGetResult: Codable, Sendable {
+    let stats: IPCRequestStats
+}
+
+nonisolated struct IPCRequestStats: Codable, Sendable {
+    let totalRequests: Int
+    let successfulRequests: Int
+    let failedRequests: Int
+    let totalInputTokens: Int
+    let totalOutputTokens: Int
+    let averageDurationMs: Double
+    let byProvider: [String: IPCProviderStats]?
+    let byModel: [String: IPCModelStats]?
+}
+
+nonisolated struct IPCProviderStats: Codable, Sendable {
+    let totalRequests: Int
+    let successfulRequests: Int
+    let failedRequests: Int
+    let totalInputTokens: Int
+    let totalOutputTokens: Int
+    let averageDurationMs: Double
+}
+
+nonisolated struct IPCModelStats: Codable, Sendable {
+    let totalRequests: Int
+    let successfulRequests: Int
+    let failedRequests: Int
+    let totalInputTokens: Int
+    let totalOutputTokens: Int
+    let averageDurationMs: Double
 }
 
 // MARK: - Dynamic Value Type

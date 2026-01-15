@@ -46,6 +46,7 @@ final class QuotaViewModel {
     @ObservationIgnored private let daemonQuotaService = DaemonQuotaService.shared
     @ObservationIgnored private let daemonAuthService = DaemonAuthService.shared
     @ObservationIgnored private let daemonAPIKeysService = DaemonAPIKeysService.shared
+    @ObservationIgnored private let daemonStatsService = DaemonStatsService.shared
     
     private func shouldUseDaemonForAuth() async -> Bool {
         guard !modeManager.isRemoteProxyMode else { return false }
@@ -993,14 +994,62 @@ final class QuotaViewModel {
     }
     
     func refreshData() async {
-        guard let client = apiClient else { return }
-        
+        if modeManager.isRemoteProxyMode {
+            await refreshDataViaAPI()
+        } else {
+            let daemonAvailable = await daemonManager.checkHealth()
+            if daemonAvailable {
+                await refreshDataViaDaemon()
+            } else if let client = apiClient {
+                await refreshDataViaAPIClient(client)
+            }
+        }
+    }
+    
+    private func refreshDataViaDaemon() async {
         do {
-            // Serialize requests to avoid connection contention (issue #37)
-            // This reduces pressure on the connection pool
+            let ipcAuthAccounts = await daemonAuthService.listAuthFiles()
+            let newAuthFiles = ipcAuthAccounts.map { $0.toAuthFile() }
+            
+            let oldNames = Set(self.authFiles.map { $0.name })
+            let newNames = Set(newAuthFiles.map { $0.name })
+            if oldNames != newNames {
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.authFilesChangedKey)
+            }
+            
+            self.authFiles = newAuthFiles
+            self.usageStats = await daemonStatsService.fetchUsageStats()
+            self.apiKeys = await daemonAPIKeysService.fetchAPIKeys()
+            
+            errorMessage = nil
+            
+            checkAccountStatusChanges()
+            pruneMenuBarItems()
+            
+            let shouldRefreshQuotas = lastQuotaRefresh == nil ||
+                Date().timeIntervalSince(lastQuotaRefresh!) >= quotaRefreshInterval
+            
+            if shouldRefreshQuotas && !isLoadingQuotas {
+                Task {
+                    await refreshAllQuotas()
+                }
+            }
+        } catch {
+            if !Task.isCancelled {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func refreshDataViaAPI() async {
+        guard let client = apiClient else { return }
+        await refreshDataViaAPIClient(client)
+    }
+    
+    private func refreshDataViaAPIClient(_ client: ManagementAPIClient) async {
+        do {
             let newAuthFiles = try await client.fetchAuthFiles()
 
-            // Only update timestamp if auth files actually changed (account added/removed)
             let oldNames = Set(self.authFiles.map { $0.name })
             let newNames = Set(newAuthFiles.map { $0.name })
             if oldNames != newNames {
@@ -1008,16 +1057,12 @@ final class QuotaViewModel {
             }
 
             self.authFiles = newAuthFiles
-
             self.usageStats = try await client.fetchUsageStats()
             self.apiKeys = try await client.fetchAPIKeys()
             
-            // Clear any previous error on success
             errorMessage = nil
             
             checkAccountStatusChanges()
-            
-            // Prune menu bar items for accounts that no longer exist
             pruneMenuBarItems()
             
             let shouldRefreshQuotas = lastQuotaRefresh == nil || 

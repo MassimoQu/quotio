@@ -3,7 +3,7 @@
 **Created:** 2026-01-13
 **Updated:** 2026-01-15
 **Branch:** feat/universal-provider-architecture  
-**Status:** Phase 4 Complete - QuotaFetchers migrated
+**Status:** Phase 4 Complete, Phase 2-3 Deferred (low value / high cost)
 
 ## Overview
 
@@ -17,7 +17,7 @@ Migration plan to remove redundant Swift code after business logic has been port
 | ManagementAPIClient | 1 | 726 | ⚠️ **BLOCKED** (still needed for remote mode + refreshData) |
 | QuotaFetchers (TS ported) | 6 | 2,217 | ✅ **Deleted** (commit 34d39bf) |
 | FallbackFormatConverter | 1 | 63 | ✅ **Simplified** (was 1,190) |
-| ProxyBridge (simplify) | 1 | ~40 lines removable | Pending Phase 2 |
+| ProxyBridge (simplify) | 1 | ~150 lines | ⏸️ **DEFERRED** (low value) |
 | **Total removed so far** | **8 files** | **~2,366 lines** | |
 
 ### Recent Progress (2026-01-15)
@@ -104,34 +104,46 @@ Files that are already deprecated and have no/minimal dependencies.
 
 ---
 
-## Phase 2: Move Fallback Logic to CLI (HIGH Priority)
+## Phase 2-3: Fallback Logic (DEFERRED)
 
-The fallback/retry logic currently lives in `ProxyBridge.swift` (930 lines). Move it to CLI for cross-platform support.
+> **Status:** ⏸️ **DEFERRED** (2026-01-15) - Low value / high cost
+>
+> **Analysis Summary:**
+> - Moving retry logic from Swift to CLI would require modifying Go proxy binary OR creating intermediate layer
+> - Complex HTTP stream interception needed for retry detection
+> - Current ProxyBridge implementation is working correctly and well-structured
+>
+> **Actual Code Footprint (smaller than estimated):**
+> - `FallbackContext` struct: 38 lines
+> - `createFallbackContext()`: 46 lines
+> - `replaceModelInBody()`: 15 lines
+> - Retry logic in `receiveResponse()`: 45 lines
+> - **Total: ~150 lines** (not 280+ as originally estimated)
+>
+> **Decision:** Keep fallback logic in ProxyBridge.swift. The code is:
+> - Working correctly in production
+> - Well-tested and battle-hardened
+> - Only ~16% of ProxyBridge.swift (150/930 lines)
+> - Would require significant effort to move with little benefit
+
+### Original Phase 2 Plan (NOT IMPLEMENTED)
 
 | ID | Task | Status |
 |----|------|--------|
-| 2.1 | Add Virtual Model / fallback chain support to CLI proxy | [ ] |
-| 2.2 | Move fallback settings API from `FallbackSettingsManager.swift` to CLI IPC | [ ] |
-| 2.3 | Implement same-type retry logic in CLI (retry on 429/5xx) | [ ] |
-| 2.4 | Update `FallbackSettingsManager.swift` to sync with CLI config | [ ] |
+| 2.1 | Add Virtual Model / fallback chain support to CLI proxy | ⏸️ Deferred |
+| 2.2 | Move fallback settings API from `FallbackSettingsManager.swift` to CLI IPC | ✅ Already done (fallback.* IPC methods exist) |
+| 2.3 | Implement same-type retry logic in CLI (retry on 429/5xx) | ⏸️ Deferred |
+| 2.4 | Update `FallbackSettingsManager.swift` to sync with CLI config | ✅ Already done (file watcher on fallback-config.json) |
 
-> **Note**: Format conversion is no longer needed - fallback only works between same model types (ModelType enum in FallbackModels.swift).
-
-**After Phase 2 completion, proceed to Phase 3.**
-
----
-
-## Phase 3: Simplify ProxyBridge (MEDIUM Priority)
-
-Once CLI handles fallback, simplify `ProxyBridge.swift` from 930 lines to ~200 lines.
+### Original Phase 3 Plan (PARTIAL)
 
 | ID | Task | Status |
 |----|------|--------|
-| 3.1 | Remove `FallbackFormatConverter` usage from `ProxyBridge.swift` | [ ] |
-| 3.2 | Remove `FallbackContext` and fallback retry logic | [ ] |
-| 3.3 | Keep only TCP passthrough with `Connection: close` header | [ ] |
+| 3.1 | Remove `FallbackFormatConverter` usage from `ProxyBridge.swift` | ⏸️ Deferred (still used for error detection) |
+| 3.2 | Remove `FallbackContext` and fallback retry logic | ⏸️ Deferred |
+| 3.3 | Keep only TCP passthrough with `Connection: close` header | ⏸️ Deferred |
 | 3.4 | ~~Delete `FallbackFormatConverter.swift` (1,190 lines)~~ | ✅ **DONE** - reduced to 63 lines (error detection only) |
-| 3.5 | Update `RequestTracker` to consume metrics from CLI API | [ ] |
+| 3.5 | Update `RequestTracker` to consume metrics from CLI API | ⏸️ Deferred |
 
 > **Note**: Phase 3.4 completed early in commit `e1ed27a`. FallbackFormatConverter now only contains error detection logic (63 lines).
 
@@ -320,9 +332,9 @@ quotio-cli daemon (TypeScript):
 | 1 | Phase 1 | Delete AppMode.swift, Migrate ManagementAPIClient | 875 |
 | 2 | Phase 4A | Delete 4 QuotaFetchers (safe deletions) | 1,211 |
 | 3 | Phase 4B | Add IPC methods, Delete Kiro + Copilot fetchers | 1,006 |
-| 4 | Phase 2-3 | Move fallback to CLI, Simplify ProxyBridge | ~40 |
+| 4 | Phase 2-3 | ~~Move fallback to CLI, Simplify ProxyBridge~~ | ⏸️ Deferred |
 | 5 | Phase 6-7 | Testing, Documentation | 0 |
-| **Total** | | | **~3,132 lines** |
+| **Total** | | | **~3,092 lines** |
 
 > **Note**: Phase 4 split into 4A (safe) and 4B (blocked). See [phase4-quota-fetcher-migration.md](./phase4-quota-fetcher-migration.md) for details.
 
