@@ -82,25 +82,31 @@ struct QuotioApp: App {
     }
     
     private func initializeApp() async {
+        NSLog("[QuotioApp] initializeApp: starting...")
         appearanceManager.applyAppearance()
         
         if !modeManager.hasCompletedOnboarding {
+            NSLog("[QuotioApp] initializeApp: showing onboarding")
             showOnboarding = true
             return
         }
         
+        NSLog("[QuotioApp] initializeApp: autoStartDaemon=%@", autoStartDaemon ? "true" : "false")
         if autoStartDaemon {
+            NSLog("[QuotioApp] initializeApp: starting daemon...")
             try? await daemonManager.start()
+            NSLog("[QuotioApp] initializeApp: daemon isRunning=%@", daemonManager.isRunning ? "true" : "false")
         } else {
+            NSLog("[QuotioApp] initializeApp: detecting running daemon...")
             await daemonManager.detectRunning()
         }
-        
-        await viewModel.loadDirectAuthFiles()
         
         statusBarManager.setViewModel(viewModel)
         updateStatusBar()
         
+        NSLog("[QuotioApp] initializeApp: calling viewModel.initialize()...")
         await viewModel.initialize()
+        NSLog("[QuotioApp] initializeApp: completed. proxyRunning=%@", viewModel.proxyManager.proxyStatus.running ? "true" : "false")
         
         #if canImport(Sparkle)
         UpdaterService.shared.checkForUpdatesInBackground()
@@ -159,7 +165,7 @@ struct QuotioApp: App {
                     updateStatusBar()
                     statusBarManager.rebuildMenuInPlace()
                 }
-                .onChange(of: viewModel.directAuthFiles.count) {
+                .onChange(of: viewModel.authFiles.count) {
                     updateStatusBar()
                     statusBarManager.rebuildMenuInPlace()
                 }

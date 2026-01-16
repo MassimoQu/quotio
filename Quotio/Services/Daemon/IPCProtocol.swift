@@ -94,6 +94,8 @@ nonisolated enum IPCMethod: String, Sendable {
     // Config
     case configGet = "config.get"
     case configSet = "config.set"
+    case configSetLocalManagementKey = "config.setLocalManagementKey"
+    case configGetLocalManagementKey = "config.getLocalManagementKey"
     case configRouting = "config.routing"
     case configDebug = "config.debug"
     case configProxyUrl = "config.proxyUrl"
@@ -156,6 +158,14 @@ nonisolated struct IPCConfigGetParams: Codable, Sendable {
 nonisolated struct IPCConfigSetParams: Codable, Sendable {
     let key: String
     let value: IPCAnyCodable
+}
+
+nonisolated struct IPCConfigSetLocalManagementKeyParams: Codable, Sendable {
+    let key: String
+}
+
+nonisolated struct IPCConfigGetLocalManagementKeyResult: Codable, Sendable {
+    let hasKey: Bool
 }
 
 nonisolated struct IPCDaemonShutdownParams: Codable, Sendable {

@@ -2045,10 +2045,6 @@ struct AboutScreen: View {
     private var updatesSection: some View {
         VStack(spacing: 12) {
             AboutUpdateCard()
-            
-            if OperatingModeManager.shared.isLocalProxyMode {
-                AboutProxyUpdateCard()
-            }
         }
         .frame(maxWidth: 500)
     }

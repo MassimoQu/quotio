@@ -21,11 +21,16 @@ final class DaemonManager {
     
     func detectRunning() async {
         guard FileManager.default.fileExists(atPath: socketPath) else {
+            NSLog("[DaemonManager] detectRunning: socket not found at %@", socketPath)
             isRunning = false
             return
         }
         
-        if await checkHealth() {
+        NSLog("[DaemonManager] detectRunning: socket exists, checking health...")
+        let healthy = await checkHealth()
+        NSLog("[DaemonManager] detectRunning: health check result = %@", healthy ? "true" : "false")
+        
+        if healthy {
             isRunning = true
             lastError = nil
             startHealthMonitoring()
@@ -35,13 +40,23 @@ final class DaemonManager {
     }
     
     var daemonBinaryPath: URL {
-        // TODO: Add quotio-cli binary to app bundle via Copy Files build phase
-        // For now, check in bundle first, then fall back to development path
         if let bundleURL = Bundle.main.resourceURL?.appendingPathComponent("quotio-cli"),
            FileManager.default.fileExists(atPath: bundleURL.path) {
             return bundleURL
         }
-        // Development fallback: check quotio-cli/dist in project root
+        
+        let bundlePath = Bundle.main.bundleURL.path
+        
+        if bundlePath.contains("/Build/Products/") {
+            if let range = bundlePath.range(of: "/build/") {
+                let projectRoot = String(bundlePath[..<range.lowerBound])
+                let devPath = URL(fileURLWithPath: projectRoot).appendingPathComponent("quotio-cli/dist/quotio")
+                if FileManager.default.fileExists(atPath: devPath.path) {
+                    return devPath
+                }
+            }
+        }
+        
         let projectRoot = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         return projectRoot.appendingPathComponent("quotio-cli/dist/quotio")
     }
@@ -56,22 +71,28 @@ final class DaemonManager {
     }
     
     func start() async throws {
+        NSLog("[DaemonManager] start: called, isRunning=%@", isRunning ? "true" : "false")
         if isRunning { return }
         
-        guard FileManager.default.fileExists(atPath: daemonBinaryPath.path) else {
-            throw DaemonError.binaryNotFound
-        }
-        
-        try await ensureSocketDirectoryExists()
-        
+        // First check if a daemon is already running (started externally)
         if FileManager.default.fileExists(atPath: socketPath) {
+            NSLog("[DaemonManager] start: socket exists, checking health...")
             if await checkHealth() {
+                NSLog("[DaemonManager] start: external daemon is healthy, using it")
                 isRunning = true
                 lastError = nil
                 startHealthMonitoring()
                 return
             }
+            NSLog("[DaemonManager] start: health check failed, will try to start new daemon")
         }
+        
+        guard FileManager.default.fileExists(atPath: daemonBinaryPath.path) else {
+            NSLog("[DaemonManager] start: binary not found at %@", daemonBinaryPath.path)
+            throw DaemonError.binaryNotFound
+        }
+        
+        try await ensureSocketDirectoryExists()
         
         let proc = Process()
         proc.executableURL = daemonBinaryPath
@@ -133,8 +154,10 @@ final class DaemonManager {
     func checkHealth() async -> Bool {
         do {
             let result = try await ipcClient.ping()
+            NSLog("[DaemonManager] checkHealth: ping succeeded, pong = %@", result.pong ? "true" : "false")
             return result.pong
         } catch {
+            NSLog("[DaemonManager] checkHealth: ping failed with error: %@", error.localizedDescription)
             return false
         }
     }
@@ -166,14 +189,20 @@ final class DaemonManager {
         healthCheckTask?.cancel()
         healthCheckTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
                 
                 if Task.isCancelled { break }
                 
                 let healthy = await checkHealth()
                 if !healthy && isRunning {
+                    // Don't disconnect - just mark as not running
+                    // The IPC client will reconnect on next request if needed
                     isRunning = false
-                    lastError = "Daemon connection lost"
+                    lastError = "Daemon health check failed"
+                    NSLog("[DaemonManager] Health check failed, marking as not running")
+                } else if healthy && !isRunning {
+                    isRunning = true
+                    lastError = nil
                 }
             }
         }

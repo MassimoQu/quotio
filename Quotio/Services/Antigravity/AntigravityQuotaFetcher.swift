@@ -124,7 +124,7 @@ nonisolated struct ModelQuota: Codable, Identifiable, Sendable {
     var id: String { name }
     
     var usedPercentage: Double {
-        100 - percentage
+        min(100, max(0, 100 - percentage))
     }
     
     var formattedPercentage: String {

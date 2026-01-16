@@ -39,27 +39,15 @@ struct ProvidersScreen: View {
         }
     }
     
-    /// All accounts grouped by provider
     private var groupedAccounts: [AIProvider: [AccountRowData]] {
         var groups: [AIProvider: [AccountRowData]] = [:]
 
-        if modeManager.isLocalProxyMode && viewModel.proxyManager.proxyStatus.running {
-            // From proxy auth files (proxy running)
-            for file in viewModel.authFiles {
-                guard let provider = file.providerType else { continue }
-                let data = AccountRowData.from(authFile: file)
-                groups[provider, default: []].append(data)
-            }
-        } else {
-            // From direct auth files (proxy not running or quota-only mode)
-            for file in viewModel.directAuthFiles {
-                let data = AccountRowData.from(directAuthFile: file)
-                groups[file.provider, default: []].append(data)
-            }
+        for file in viewModel.authFiles {
+            guard let provider = file.providerType else { continue }
+            let data = AccountRowData.from(authFile: file)
+            groups[provider, default: []].append(data)
         }
 
-        // Add auto-detected accounts (Cursor, Trae)
-        // Note: GLM uses API key auth via CustomProviderService, so skip it here
         for (provider, quotas) in viewModel.providerQuotas {
             if !provider.supportsManualAuth && provider != .glm {
                 for (accountKey, _) in quotas {
@@ -69,9 +57,7 @@ struct ProvidersScreen: View {
             }
         }
 
-        // Add GLM providers from CustomProviderService
         for glmProvider in customProviderService.providers.filter({ $0.type == .glmCompatibility && $0.isEnabled }) {
-            // Use provider name as display name (store provider ID for editing)
             let data = AccountRowData(
                 id: glmProvider.id.uuidString,
                 provider: .glm,
@@ -139,7 +125,8 @@ struct ProvidersScreen: View {
             // Failure case is silently ignored - user can retry via UI
         }
         .task {
-            await viewModel.loadDirectAuthFiles()
+            // Use daemon IPC to load auth files (works even when proxy not running)
+            await viewModel.refreshData()
         }
         .alert("providers.proxyRequired.title".localized(), isPresented: $showProxyRequiredAlert) {
             Button("action.startProxy".localized()) {
@@ -211,11 +198,8 @@ struct ProvidersScreen: View {
         ToolbarItem(placement: .automatic) {
             Button {
                 Task {
-        if modeManager.isLocalProxyMode && viewModel.proxyManager.proxyStatus.running {
-                        await viewModel.refreshData()
-                    } else {
-                        await viewModel.loadDirectAuthFiles()
-                    }
+                    // Always use daemon IPC for refresh
+                    await viewModel.refreshData()
                     await viewModel.refreshAutoDetectedProviders()
                 }
             } label: {

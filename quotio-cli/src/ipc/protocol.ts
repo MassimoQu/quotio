@@ -179,6 +179,14 @@ export interface IPCMethods {
 		params: { key: string; value: unknown };
 		result: { success: true };
 	};
+	"config.setLocalManagementKey": {
+		params: { key: string };
+		result: { success: true };
+	};
+	"config.getLocalManagementKey": {
+		params: Record<string, never>;
+		result: { hasKey: boolean };
+	};
 
 	// -------------------------------------------------------------------------
 	// Universal Provider operations

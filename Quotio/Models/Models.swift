@@ -270,11 +270,12 @@ nonisolated struct AuthFile: Codable, Identifiable, Hashable, Sendable {
             return account
         }
         var key = name
-        if key.hasPrefix("github-copilot-") {
-            key = String(key.dropFirst("github-copilot-".count))
-        }
         if key.hasSuffix(".json") {
             key = String(key.dropLast(".json".count))
+        }
+        let providerPrefix = "\(provider)-"
+        if key.hasPrefix(providerPrefix) {
+            key = String(key.dropFirst(providerPrefix.count))
         }
         return key
     }

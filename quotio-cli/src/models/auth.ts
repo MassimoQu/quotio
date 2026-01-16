@@ -94,11 +94,12 @@ export function getQuotaLookupKey(auth: AuthFile): string {
 		return auth.account;
 	}
 	let key = auth.name;
-	if (key.startsWith("github-copilot-")) {
-		key = key.slice("github-copilot-".length);
-	}
 	if (key.endsWith(".json")) {
 		key = key.slice(0, -".json".length);
+	}
+	const providerPrefix = `${auth.provider}-`;
+	if (key.startsWith(providerPrefix)) {
+		key = key.slice(providerPrefix.length);
 	}
 	return key;
 }

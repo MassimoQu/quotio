@@ -21,17 +21,17 @@ import {
 } from "../index.ts";
 
 const quotaColumns: TableColumn[] = [
-	{ key: "provider", header: "Provider", width: 15 },
-	{ key: "account", header: "Account", width: 25 },
-	{ key: "status", header: "Status", width: 10 },
+	{ key: "provider", header: "Provider" },
+	{ key: "account", header: "Account" },
+	{ key: "status", header: "Status" },
 ];
 
 const detailColumns: TableColumn[] = [
-	{ key: "provider", header: "Provider", width: 15 },
-	{ key: "account", header: "Account", width: 25 },
-	{ key: "model", header: "Model", width: 20 },
-	{ key: "remaining", header: "Remaining", width: 12 },
-	{ key: "resetTime", header: "Reset", width: 20 },
+	{ key: "provider", header: "Provider" },
+	{ key: "account", header: "Account" },
+	{ key: "model", header: "Model" },
+	{ key: "remaining", header: "Remaining", align: "right" },
+	{ key: "resetTime", header: "Reset" },
 ];
 
 async function handleQuota(
@@ -274,7 +274,7 @@ async function fetchLocalQuotas(
 }
 
 function formatRemaining(percentage: number): string {
-	if (percentage < 0) return colors.dim("N/A");
+	if (percentage < 0) return colors.red("0%");
 	if (percentage >= 75) return colors.green(`${percentage.toFixed(0)}%`);
 	if (percentage >= 25) return colors.yellow(`${percentage.toFixed(0)}%`);
 	return colors.red(`${percentage.toFixed(0)}%`);

@@ -44,9 +44,8 @@ struct DashboardScreen: View {
     
     // MARK: - Precomputed Properties (performance optimization)
     
-    /// Unique provider count from direct auth files
     private var directProvidersCount: Int {
-        Set(viewModel.directAuthFiles.map { $0.provider }).count
+        Set(viewModel.authFiles.compactMap { $0.providerType }).count
     }
     
     /// Lowest quota percentage across all providers using total usage logic
@@ -67,9 +66,8 @@ struct DashboardScreen: View {
         return allTotals.min() ?? 100
     }
     
-    /// Grouped accounts by provider (cached computation)
-    private var groupedDirectAuthFiles: [AIProvider: [DirectAuthFile]] {
-        Dictionary(grouping: viewModel.directAuthFiles) { $0.provider }
+    private var groupedAuthFiles: [AIProvider: [AuthFile]] {
+        Dictionary(grouping: viewModel.authFiles.filter { $0.providerType != nil }) { $0.providerType! }
     }
     
     var body: some View {
@@ -340,7 +338,7 @@ struct DashboardScreen: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 16)], spacing: 16) {
             KPICard(
                 title: "dashboard.trackedAccounts".localized(),
-                value: "\(viewModel.directAuthFiles.count)",
+                value: "\(viewModel.authFiles.count)",
                 subtitle: "dashboard.accounts".localized(),
                 icon: "person.2.fill",
                 color: .blue
@@ -422,7 +420,7 @@ struct DashboardScreen: View {
     
     private var trackedAccountsSection: some View {
         GroupBox {
-            if viewModel.directAuthFiles.isEmpty {
+            if viewModel.authFiles.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.largeTitle)
@@ -441,9 +439,8 @@ struct DashboardScreen: View {
                 .padding(.vertical, 20)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    // Use precomputed groupedDirectAuthFiles instead of inline Dictionary(grouping:)
-                    ForEach(AIProvider.allCases.filter { groupedDirectAuthFiles[$0] != nil }) { provider in
-                        if let accounts = groupedDirectAuthFiles[provider] {
+                    ForEach(AIProvider.allCases.filter { groupedAuthFiles[$0] != nil }) { provider in
+                        if let accounts = groupedAuthFiles[provider] {
                             HStack(spacing: 12) {
                                 ProviderIcon(provider: provider, size: 20)
                                 

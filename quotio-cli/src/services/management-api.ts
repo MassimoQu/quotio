@@ -68,7 +68,17 @@ export class ManagementAPIClient {
 	readonly isRemote: boolean;
 
 	constructor(options: ManagementAPIClientOptions) {
-		this.baseURL = options.baseURL.replace(/\/$/, "");
+		let baseURL = options.baseURL.replace(/\/$/, "");
+		// For local connections, ensure we have the /v0/management prefix
+		// CLIProxyAPI Management API is at /v0/management/*
+		if (!options.isRemote && !baseURL.endsWith("/v0/management")) {
+			if (baseURL.endsWith("/v0")) {
+				baseURL += "/management";
+			} else {
+				baseURL += "/v0/management";
+			}
+		}
+		this.baseURL = baseURL;
 		this.authKey = options.authKey;
 		this.isRemote = options.isRemote ?? false;
 		this.timeout =

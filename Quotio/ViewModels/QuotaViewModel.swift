@@ -18,7 +18,6 @@ final class QuotaViewModel {
     @ObservationIgnored private let antigravityFetcher = AntigravityQuotaFetcher()
 
     @ObservationIgnored private let glmFetcher = GLMQuotaFetcher()
-    @ObservationIgnored private let directAuthService = DirectAuthFileService()
     @ObservationIgnored private let notificationManager = NotificationManager.shared
     @ObservationIgnored private let modeManager = OperatingModeManager.shared
     @ObservationIgnored private let refreshSettings = RefreshSettingsManager.shared
@@ -63,9 +62,6 @@ final class QuotaViewModel {
     var isLoadingQuotas = false
     var errorMessage: String?
     var oauthState: OAuthState?
-    
-    /// Direct auth files for quota-only mode
-    var directAuthFiles: [DirectAuthFile] = []
     
     /// Last quota refresh time (for quota-only mode display)
     var lastQuotaRefreshTime: Date?
@@ -225,12 +221,31 @@ final class QuotaViewModel {
         await refreshQuotasUnified()
         
         let autoStartProxy = UserDefaults.standard.bool(forKey: "autoStartProxy")
-        if autoStartProxy && proxyManager.isBinaryInstalled {
+        let binaryInstalled = proxyManager.isBinaryInstalled
+        
+        NSLog("[QuotaViewModel] initializeFullMode: autoStartProxy=%@, binaryInstalled=%@", 
+              autoStartProxy ? "true" : "false", 
+              binaryInstalled ? "true" : "false")
+        
+        if autoStartProxy && binaryInstalled {
+            NSLog("[QuotaViewModel] Auto-starting proxy...")
             await startProxy()
+            
+            if proxyManager.proxyStatus.running {
+                NSLog("[QuotaViewModel] Proxy started successfully")
+            } else {
+                NSLog("[QuotaViewModel] Proxy failed to start: %@", errorMessage ?? "unknown error")
+            }
             
             // Check for proxy upgrade after starting
             await checkForProxyUpgrade()
         } else {
+            if !autoStartProxy {
+                NSLog("[QuotaViewModel] Skipping proxy auto-start: autoStartProxy is disabled")
+            }
+            if !binaryInstalled {
+                NSLog("[QuotaViewModel] Skipping proxy auto-start: binary not installed")
+            }
             // If not auto-starting proxy, start quota auto-refresh
             startQuotaAutoRefreshWithoutProxy()
         }
@@ -243,13 +258,7 @@ final class QuotaViewModel {
     
     /// Initialize for Quota-Only Mode (no proxy)
     private func initializeQuotaOnlyMode() async {
-        // Load auth files directly from filesystem
-        await loadDirectAuthFiles()
-        
-        // Fetch quotas directly
         await refreshQuotasDirectly()
-        
-        // Start auto-refresh for quota-only mode
         startQuotaOnlyAutoRefresh()
     }
     
@@ -294,12 +303,7 @@ final class QuotaViewModel {
         await initializeRemoteMode()
     }
     
-    // MARK: - Direct Auth File Management (Quota-Only Mode)
-    
-    /// Load auth files directly from filesystem
-    func loadDirectAuthFiles() async {
-        directAuthFiles = await directAuthService.scanAllAuthFiles()
-    }
+
     
     func refreshQuotasDirectly() async {
         guard !isLoadingQuotas else { return }
@@ -348,14 +352,6 @@ final class QuotaViewModel {
             guard let provider = file.providerType else { continue }
             let accountKey = file.quotaLookupKey.isEmpty ? file.name : file.quotaLookupKey
             let item = MenuBarQuotaItem(provider: provider.rawValue, accountKey: accountKey)
-            if !seen.contains(item.id) {
-                seen.insert(item.id)
-                availableItems.append(item)
-            }
-        }
-        
-        for file in directAuthFiles {
-            let item = MenuBarQuotaItem(provider: file.provider.rawValue, accountKey: file.email ?? file.filename)
             if !seen.contains(item.id) {
                 seen.insert(item.id)
                 availableItems.append(item)
@@ -459,20 +455,6 @@ final class QuotaViewModel {
                 let targetKey = file.quotaLookupKey.isEmpty ? file.name : file.quotaLookupKey
                 remappedQuotas[targetKey] = data
                 consumedRawKeys.insert(filenameKey)
-            }
-        }
-        
-        if modeManager.isMonitorMode {
-            for file in directAuthFiles where file.provider == .kiro {
-                let filenameKey = cleanName(file.filename)
-                
-                if consumedRawKeys.contains(filenameKey) { continue }
-                
-                if let data = rawQuotas[filenameKey] {
-                    let targetKey = file.email ?? file.filename
-                    remappedQuotas[targetKey] = data
-                    consumedRawKeys.insert(filenameKey)
-                }
             }
         }
         
@@ -871,6 +853,7 @@ final class QuotaViewModel {
     var readyAccounts: Int { authFiles.filter { $0.isReady }.count }
     
     func startProxy() async {
+        NSLog("[QuotaViewModel] startProxy: beginning proxy start sequence")
         do {
             // Wire up ProxyBridge callback to RequestTracker before starting
             proxyManager.proxyBridge.onRequestCompleted = { [weak self] metadata in
@@ -878,6 +861,7 @@ final class QuotaViewModel {
             }
             
             try await proxyManager.start()
+            NSLog("[QuotaViewModel] startProxy: proxy started, setting up API client")
             setupAPIClient()
             startAutoRefresh()
             restartWarmupScheduler()
@@ -885,6 +869,7 @@ final class QuotaViewModel {
             // Start RequestTracker
             requestTracker.start()
             
+            NSLog("[QuotaViewModel] startProxy: calling refreshData() after proxy start")
             await refreshData()
             await runWarmupCycle()
             
@@ -994,22 +979,30 @@ final class QuotaViewModel {
     }
     
     func refreshData() async {
+        NSLog("[QuotaViewModel] refreshData: starting, isRemoteProxyMode=%d", modeManager.isRemoteProxyMode ? 1 : 0)
         if modeManager.isRemoteProxyMode {
             await refreshDataViaAPI()
         } else {
             let daemonAvailable = await daemonManager.checkHealth()
+            NSLog("[QuotaViewModel] refreshData: daemonAvailable=%d", daemonAvailable ? 1 : 0)
             if daemonAvailable {
                 await refreshDataViaDaemon()
             } else if let client = apiClient {
+                NSLog("[QuotaViewModel] refreshData: falling back to APIClient")
                 await refreshDataViaAPIClient(client)
+            } else {
+                NSLog("[QuotaViewModel] refreshData: no daemon, no apiClient - cannot refresh")
             }
         }
     }
     
     private func refreshDataViaDaemon() async {
+        NSLog("[QuotaViewModel] refreshDataViaDaemon: calling daemonAuthService.listAuthFiles()")
         do {
             let ipcAuthAccounts = await daemonAuthService.listAuthFiles()
+            NSLog("[QuotaViewModel] refreshDataViaDaemon: got %d IPC accounts", ipcAuthAccounts.count)
             let newAuthFiles = ipcAuthAccounts.map { $0.toAuthFile() }
+            NSLog("[QuotaViewModel] refreshDataViaDaemon: converted to %d AuthFiles", newAuthFiles.count)
             
             let oldNames = Set(self.authFiles.map { $0.name })
             let newNames = Set(newAuthFiles.map { $0.name })
@@ -1489,11 +1482,12 @@ final class QuotaViewModel {
     
     func deleteAuthFile(_ file: AuthFile) async {
         do {
+            // Use file.id (original filename) for deletion, not file.name (display name)
             if await shouldUseDaemonForAuth() {
-                try await daemonAuthService.deleteAuthFile(name: file.name)
+                try await daemonAuthService.deleteAuthFile(name: file.id)
             } else {
                 guard let client = apiClient else { return }
-                try await client.deleteAuthFile(name: file.name)
+                try await client.deleteAuthFile(name: file.id)
             }
             
             if let provider = file.providerType {
@@ -1534,22 +1528,6 @@ final class QuotaViewModel {
             guard let provider = file.providerType else { continue }
             let accountKey = file.quotaLookupKey.isEmpty ? file.name : file.quotaLookupKey
             let item = MenuBarQuotaItem(provider: provider.rawValue, accountKey: accountKey)
-            if !seen.contains(item.id) {
-                seen.insert(item.id)
-                validItems.append(item)
-            }
-        }
-        
-        // Add items from direct auth files (quota-only mode)
-        for file in directAuthFiles {
-            var accountKey = file.email ?? file.filename
-            
-            // Kiro/CodeWhisperer special handling: Fetcher uses filename as key
-            if file.provider == .kiro {
-                accountKey = file.filename.replacingOccurrences(of: ".json", with: "")
-            }
-            
-            let item = MenuBarQuotaItem(provider: file.provider.rawValue, accountKey: accountKey)
             if !seen.contains(item.id) {
                 seen.insert(item.id)
                 validItems.append(item)

@@ -14,18 +14,15 @@ struct QuotaScreen: View {
     
     // MARK: - Data Sources
     
-    /// All providers with quota data (unified from both proxy and direct sources)
     private var availableProviders: [AIProvider] {
         var providers = Set<AIProvider>()
         
-        // From proxy auth files
         for file in viewModel.authFiles {
             if let provider = file.providerType {
                 providers.insert(provider)
             }
         }
         
-        // From direct quota data
         for provider in viewModel.providerQuotas.keys {
             providers.insert(provider)
         }
@@ -33,16 +30,13 @@ struct QuotaScreen: View {
         return providers.sorted { $0.displayName < $1.displayName }
     }
     
-    /// Get account count for a provider
     private func accountCount(for provider: AIProvider) -> Int {
         var accounts = Set<String>()
         
-        // From auth files
         for file in viewModel.authFiles where file.providerType == provider {
             accounts.insert(file.quotaLookupKey)
         }
         
-        // From quota data
         if let quotaAccounts = viewModel.providerQuotas[provider] {
             for key in quotaAccounts.keys {
                 accounts.insert(key)
@@ -67,12 +61,11 @@ struct QuotaScreen: View {
         return allTotals.min()
     }
     
-    /// Check if we have any data to show
     private var hasAnyData: Bool {
-        if modeManager.isMonitorMode {
-            return !viewModel.providerQuotas.isEmpty || !viewModel.directAuthFiles.isEmpty
+        if !viewModel.providerQuotas.isEmpty {
+            return true
         }
-        return !viewModel.authFiles.isEmpty || !viewModel.providerQuotas.isEmpty
+        return !viewModel.authFiles.isEmpty
     }
     
     var body: some View {
@@ -135,6 +128,9 @@ struct QuotaScreen: View {
                 }
                 .disabled(viewModel.isLoadingQuotas)
             }
+        }
+        .task {
+            await viewModel.refreshQuotasUnified()
         }
         .onAppear {
             if selectedProvider == nil, let first = availableProviders.first {
@@ -341,26 +337,26 @@ private struct ProviderQuotaView: View {
     let subscriptionInfos: [String: SubscriptionInfo]
     let isLoading: Bool
     
-    /// Get all accounts (from auth files or quota data keys)
     private var allAccounts: [AccountInfo] {
         var accounts: [AccountInfo] = []
+        var existingKeys = Set<String>()
         
-        // From auth files
         for file in authFiles {
             let key = file.quotaLookupKey
-            accounts.append(AccountInfo(
-                key: key,
-                email: file.email ?? file.name,
-                status: file.status,
-                statusColor: file.statusColor,
-                authFile: file,
-                quotaData: quotaData[key],
-                subscriptionInfo: subscriptionInfos[key]
-            ))
+            if !existingKeys.contains(key) {
+                existingKeys.insert(key)
+                accounts.append(AccountInfo(
+                    key: key,
+                    email: file.email ?? file.name,
+                    status: file.status,
+                    statusColor: file.statusColor,
+                    authFile: file,
+                    quotaData: quotaData[key],
+                    subscriptionInfo: subscriptionInfos[key]
+                ))
+            }
         }
         
-        // From quota data (if not already added)
-        let existingKeys = Set(accounts.map { $0.key })
         for (key, data) in quotaData {
             if !existingKeys.contains(key) {
                 accounts.append(AccountInfo(
@@ -476,34 +472,26 @@ private struct AccountQuotaCardV2: View {
             $0.name.contains("gemini-3-pro") && !$0.name.contains("image") 
         }
         if !gemini3ProModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(gemini3ProModels.map(\.percentage))
-            if aggregatedQuota >= 0 {
-                groups.append(AntigravityDisplayGroup(name: "Gemini 3 Pro", percentage: aggregatedQuota, models: gemini3ProModels))
-            }
+            let aggregatedQuota = max(0, settings.aggregateModelPercentages(gemini3ProModels.map(\.percentage)))
+            groups.append(AntigravityDisplayGroup(name: "Gemini 3 Pro", percentage: aggregatedQuota, models: gemini3ProModels))
         }
         
         let gemini3FlashModels = data.models.filter { $0.name.contains("gemini-3-flash") }
         if !gemini3FlashModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(gemini3FlashModels.map(\.percentage))
-            if aggregatedQuota >= 0 {
-                groups.append(AntigravityDisplayGroup(name: "Gemini 3 Flash", percentage: aggregatedQuota, models: gemini3FlashModels))
-            }
+            let aggregatedQuota = max(0, settings.aggregateModelPercentages(gemini3FlashModels.map(\.percentage)))
+            groups.append(AntigravityDisplayGroup(name: "Gemini 3 Flash", percentage: aggregatedQuota, models: gemini3FlashModels))
         }
         
         let geminiImageModels = data.models.filter { $0.name.contains("image") }
         if !geminiImageModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(geminiImageModels.map(\.percentage))
-            if aggregatedQuota >= 0 {
-                groups.append(AntigravityDisplayGroup(name: "Gemini 3 Image", percentage: aggregatedQuota, models: geminiImageModels))
-            }
+            let aggregatedQuota = max(0, settings.aggregateModelPercentages(geminiImageModels.map(\.percentage)))
+            groups.append(AntigravityDisplayGroup(name: "Gemini 3 Image", percentage: aggregatedQuota, models: geminiImageModels))
         }
         
         let claudeModels = data.models.filter { $0.name.contains("claude") }
         if !claudeModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(claudeModels.map(\.percentage))
-            if aggregatedQuota >= 0 {
-                groups.append(AntigravityDisplayGroup(name: "Claude", percentage: aggregatedQuota, models: claudeModels))
-            }
+            let aggregatedQuota = max(0, settings.aggregateModelPercentages(claudeModels.map(\.percentage)))
+            groups.append(AntigravityDisplayGroup(name: "Claude", percentage: aggregatedQuota, models: claudeModels))
         }
         
         return groups.sorted { $0.percentage < $1.percentage }
@@ -717,8 +705,8 @@ private struct AccountQuotaCardV2: View {
     // MARK: - Usage Section
 
     private var isQuotaUnavailable: Bool {
-        guard let data = account.quotaData else { return false }
-        return data.models.allSatisfy { $0.percentage < 0 }
+        guard let data = account.quotaData else { return true }
+        return data.models.isEmpty
     }
     
     private var displayStyle: QuotaDisplayStyle { settings.quotaDisplayStyle }

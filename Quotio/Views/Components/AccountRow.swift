@@ -83,21 +83,6 @@ struct AccountRowData: Identifiable, Hashable {
         )
     }
     
-    /// Create from DirectAuthFile (quota-only mode or proxy stopped)
-    static func from(directAuthFile: DirectAuthFile) -> AccountRowData {
-        let name = directAuthFile.email ?? directAuthFile.filename
-        return AccountRowData(
-            id: directAuthFile.id,
-            provider: directAuthFile.provider,
-            displayName: name,
-            source: .direct,
-            status: nil,
-            statusMessage: nil,
-            isDisabled: false,
-            canDelete: false
-        )
-    }
-    
     /// Create from auto-detected account (Cursor, Trae)
     static func from(provider: AIProvider, accountKey: String) -> AccountRowData {
         AccountRowData(

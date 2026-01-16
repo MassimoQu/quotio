@@ -254,7 +254,7 @@ const handlers: Record<string, MethodHandler> = {
 				);
 
 				quotas.push({
-					provider: providerMeta?.displayName ?? provider ?? "unknown",
+					provider: providerMeta?.id ?? provider ?? "unknown",
 					email: email ?? "unknown",
 					models: data.models.map((m) => ({
 						name: m.name,
@@ -372,15 +372,31 @@ const handlers: Record<string, MethodHandler> = {
 						(p) => p.id === provider || fileName.startsWith(p.id),
 					);
 
-					accounts.push({
-						id: fileName.replace(".json", ""),
-						name:
-							content.email ?? content.account ?? fileName.replace(".json", ""),
-						provider: providerMeta?.displayName ?? provider,
-						email: content.email,
-						status: content.status ?? "ready",
-						disabled: Boolean(content.disabled),
-					});
+				// Extract account identifier with fallbacks:
+				// 1. email (if non-empty)
+				// 2. username (GitHub Copilot uses this)
+				// 3. account field
+				// 4. Derive from filename (strip provider prefix and .json suffix)
+				const email = content.email && content.email.length > 0 ? content.email : undefined;
+				const username = content.username && content.username.length > 0 ? content.username : undefined;
+				const account = content.account && content.account.length > 0 ? content.account : undefined;
+				
+				// For filename fallback, strip provider prefix (e.g., "kiro-google-XXX" -> "google-XXX")
+				const fileId = fileName.replace(".json", "");
+				const filenameFallback = fileId.startsWith(`${provider}-`)
+					? fileId.slice(`${provider}-`.length)
+					: fileId;
+				
+				const accountIdentifier = email ?? username ?? account ?? filenameFallback;
+				
+				accounts.push({
+					id: fileId,
+					name: accountIdentifier,
+					provider: providerMeta?.id ?? provider,
+					email: email ?? username, // For quota lookup key matching
+					status: content.status ?? "ready",
+					disabled: Boolean(content.disabled),
+				});
 				} catch {}
 			}
 		} catch {}
@@ -400,6 +416,20 @@ const handlers: Record<string, MethodHandler> = {
 		store[opts.key] = opts.value;
 		await saveConfigStore();
 		return { success: true as const };
+	},
+
+	"config.setLocalManagementKey": async (params: unknown) => {
+		const opts = params as { key: string };
+		const store = await loadConfigStore();
+		store.localManagementKey = opts.key;
+		await saveConfigStore();
+		logger.debug("Local management key stored");
+		return { success: true as const };
+	},
+
+	"config.getLocalManagementKey": async () => {
+		const store = await loadConfigStore();
+		return { hasKey: Boolean(store.localManagementKey) };
 	},
 
 	"universal.list": async () => {
@@ -1057,13 +1087,23 @@ const handlers: Record<string, MethodHandler> = {
 			return { success: false, error: "Proxy not running" };
 		}
 
+		const store = await loadConfigStore();
+		const managementKey = store.localManagementKey as string | undefined;
+
+		if (!managementKey) {
+			return { success: false, error: "Management key not configured. Please restart the proxy from Quotio app." };
+		}
+
+		// Ensure name doesn't have .json extension for consistency
+		const baseName = name.endsWith(".json") ? name.slice(0, -5) : name;
+
 		const client = new ManagementAPIClient({
 			baseURL: `http://localhost:${proxyState.port}`,
-			authKey: "quotio-cli-key",
+			authKey: managementKey,
 		});
 
 		try {
-			await client.deleteAuthFile(name);
+			await client.deleteAuthFile(baseName);
 			return { success: true };
 		} catch (err) {
 			return {
@@ -1081,9 +1121,16 @@ const handlers: Record<string, MethodHandler> = {
 			return { success: false, error: "Proxy not running" };
 		}
 
+		const store = await loadConfigStore();
+		const managementKey = store.localManagementKey as string | undefined;
+
+		if (!managementKey) {
+			return { success: false, error: "Management key not configured. Please restart the proxy from Quotio app." };
+		}
+
 		const client = new ManagementAPIClient({
 			baseURL: `http://localhost:${proxyState.port}`,
-			authKey: "quotio-cli-key",
+			authKey: managementKey,
 		});
 
 		try {

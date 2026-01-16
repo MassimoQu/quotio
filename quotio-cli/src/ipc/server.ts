@@ -31,7 +31,11 @@ interface ClientConnection {
 	connectedAt: Date;
 }
 
-type SocketData = { parser: (chunk: Buffer | string) => void };
+interface SocketData {
+	parser: (chunk: Buffer | string) => void;
+	pendingWrites: Uint8Array[];
+	isWriting: boolean;
+}
 type IPCServer = TCPSocketListener<SocketData> | UnixSocketListener<SocketData>;
 
 interface IPCServerState {
@@ -91,29 +95,60 @@ function isJsonRpcErrorResponse(obj: unknown): obj is JsonRpcErrorResponse {
 	return typeof obj === "object" && obj !== null && "error" in obj;
 }
 
-function processMessage(
-	socket: Socket<{ parser: (chunk: Buffer | string) => void }>,
-	rawMessage: string,
-): void {
+function processMessage(socket: Socket<SocketData>, rawMessage: string): void {
 	const parsed = parseRequest(rawMessage);
 
 	if (isJsonRpcErrorResponse(parsed)) {
-		socket.write(encodeMessage(parsed));
+		writeToSocket(socket, encodeMessage(parsed));
 		return;
 	}
 
 	handleRequest(parsed)
 		.then((response) => {
-			socket.write(encodeMessage(response));
+			writeToSocket(socket, encodeMessage(response));
 		})
 		.catch((error) => {
 			const message = error instanceof Error ? error.message : String(error);
-			socket.write(
+			writeToSocket(
+				socket,
 				encodeMessage(
 					createErrorResponse(parsed.id, ErrorCodes.INTERNAL_ERROR, message),
 				),
 			);
 		});
+}
+
+function flushPendingWrites(socket: Socket<SocketData>): void {
+	const data = socket.data;
+	if (data.isWriting || data.pendingWrites.length === 0) return;
+
+	data.isWriting = true;
+
+	while (data.pendingWrites.length > 0) {
+		const chunk = data.pendingWrites[0];
+		if (!chunk) break;
+
+		const written = socket.write(chunk);
+
+		if (written === 0) {
+			break;
+		}
+
+		if (written < chunk.byteLength) {
+			data.pendingWrites[0] = chunk.subarray(written);
+			break;
+		}
+
+		data.pendingWrites.shift();
+	}
+
+	data.isWriting = false;
+}
+
+function writeToSocket(socket: Socket<SocketData>, message: string): void {
+	const encoded = new TextEncoder().encode(message);
+	socket.data.pendingWrites.push(encoded);
+	flushPendingWrites(socket);
 }
 
 export async function startServer(): Promise<void> {
@@ -125,10 +160,10 @@ export async function startServer(): Promise<void> {
 	state.connectionInfo = connInfo;
 
 	const socketHandlers = {
-		open(socket: Socket<{ parser: (chunk: Buffer | string) => void }>) {
+		open(socket: Socket<SocketData>) {
 			const connId = ++connectionIdCounter;
 			const parser = createMessageParser((msg) => processMessage(socket, msg));
-			socket.data = { parser };
+			socket.data = { parser, pendingWrites: [], isWriting: false };
 
 			state.connections.set(connId, {
 				socket,
@@ -138,14 +173,15 @@ export async function startServer(): Promise<void> {
 			logger.debug("IPC client connected", { connId });
 		},
 
-		data(
-			socket: Socket<{ parser: (chunk: Buffer | string) => void }>,
-			buffer: Buffer,
-		) {
+		data(socket: Socket<SocketData>, buffer: Buffer) {
 			socket.data.parser(buffer);
 		},
 
-		close(socket: Socket<{ parser: (chunk: Buffer | string) => void }>) {
+		drain(socket: Socket<SocketData>) {
+			flushPendingWrites(socket);
+		},
+
+		close(socket: Socket<SocketData>) {
 			for (const [id, conn] of state.connections) {
 				if (conn.socket === socket) {
 					state.connections.delete(id);
@@ -155,10 +191,7 @@ export async function startServer(): Promise<void> {
 			}
 		},
 
-		error(
-			_socket: Socket<{ parser: (chunk: Buffer | string) => void }>,
-			error: Error,
-		) {
+		error(_socket: Socket<SocketData>, error: Error) {
 			logger.error(`IPC socket error: ${error.message}`);
 		},
 	};
@@ -175,7 +208,7 @@ export async function startServer(): Promise<void> {
 			}
 		}
 
-		state.server = Bun.listen<{ parser: (chunk: Buffer | string) => void }>({
+		state.server = Bun.listen<SocketData>({
 			unix: connInfo.path,
 			socket: socketHandlers,
 		});
@@ -188,7 +221,7 @@ export async function startServer(): Promise<void> {
 
 		logger.info(`IPC server listening on unix:${connInfo.path}`);
 	} else {
-		state.server = Bun.listen<{ parser: (chunk: Buffer | string) => void }>({
+		state.server = Bun.listen<SocketData>({
 			hostname: connInfo.host,
 			port: connInfo.port,
 			socket: socketHandlers,
@@ -245,7 +278,7 @@ export function broadcast(response: JsonRpcResponse): void {
 	const message = encodeMessage(response);
 	for (const [, conn] of state.connections) {
 		try {
-			conn.socket.write(message);
+			writeToSocket(conn.socket, message);
 		} catch {}
 	}
 }

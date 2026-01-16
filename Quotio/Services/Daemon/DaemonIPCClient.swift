@@ -5,13 +5,47 @@
 
 import Foundation
 
+// MARK: - Connection State
+
+enum IPCConnectionState: Sendable, CustomStringConvertible {
+    case disconnected
+    case connecting
+    case connected
+    case failed(String)
+    
+    var description: String {
+        switch self {
+        case .disconnected: return "disconnected"
+        case .connecting: return "connecting"
+        case .connected: return "connected"
+        case .failed(let reason): return "failed(\(reason))"
+        }
+    }
+}
+
+// MARK: - Pending Request
+
+private struct PendingRequest: @unchecked Sendable {
+    let continuation: CheckedContinuation<Data, Error>
+    let timeoutTask: Task<Void, Never>
+    let method: String
+    let createdAt: Date
+}
+
+// MARK: - DaemonIPCClient
+
 actor DaemonIPCClient {
+    
     private var fileDescriptor: Int32 = -1
     private var requestIdCounter = 0
-    private var pendingRequests: [Int: CheckedContinuation<Data, Error>] = [:]
+    private var pendingRequests: [Int: PendingRequest] = [:]
     private var buffer = Data()
-    private var readTask: Task<Void, Never>?
     private let timeout: TimeInterval
+    private var connectTask: Task<Void, Error>?
+    private var readerThread: Thread?
+    private var shouldStopReader = false
+    
+    private(set) var state: IPCConnectionState = .disconnected
     
     static let shared = DaemonIPCClient()
     
@@ -19,11 +53,8 @@ actor DaemonIPCClient {
         self.timeout = timeout
     }
     
-    var socketPath: String {
+    nonisolated var socketPath: String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        // Must match quotio-cli daemon socket path
-        // macOS: ~/Library/Caches/quotio-cli/quotio.sock (cache dir for transient runtime files)
-        // Linux: ~/.cache/quotio-cli/quotio.sock
         #if os(macOS)
         return "\(home)/Library/Caches/quotio-cli/quotio.sock"
         #else
@@ -32,20 +63,56 @@ actor DaemonIPCClient {
     }
     
     var isConnected: Bool {
-        fileDescriptor >= 0
+        if case .connected = state, fileDescriptor >= 0 {
+            return true
+        }
+        return false
     }
     
     func connect() async throws {
-        if fileDescriptor >= 0 { return }
+        if case .connected = state, fileDescriptor >= 0 {
+            log("connect: already connected")
+            return
+        }
+        
+        if let existingTask = connectTask {
+            log("connect: waiting for existing connection attempt")
+            try await existingTask.value
+            return
+        }
+        
+        let task = Task<Void, Error> {
+            try await performConnect()
+        }
+        connectTask = task
+        
+        do {
+            try await task.value
+            connectTask = nil
+        } catch {
+            connectTask = nil
+            throw error
+        }
+    }
+    
+    private func performConnect() async throws {
+        state = .connecting
         
         let path = socketPath
         guard FileManager.default.fileExists(atPath: path) else {
+            log("performConnect: socket not found at \(path)")
+            state = .failed("Daemon not running")
             throw IPCClientError.daemonNotRunning
         }
         
+        log("performConnect: connecting to \(path)")
+        
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else {
-            throw IPCClientError.connectionFailed("Failed to create socket")
+            let err = errno
+            log("performConnect: socket() failed, errno=\(err)")
+            state = .failed("Failed to create socket")
+            throw IPCClientError.connectionFailed("Failed to create socket: errno \(err)")
         }
         
         var addr = sockaddr_un()
@@ -63,29 +130,130 @@ actor DaemonIPCClient {
             }
         }
         
-        guard connectResult == 0 else {
-            close(fd)
-            throw IPCClientError.connectionFailed("Failed to connect: errno \(errno)")
+        if connectResult != 0 {
+            let err = errno
+            Darwin.close(fd)
+            log("performConnect: connect() failed, errno=\(err)")
+            state = .failed("Connection refused")
+            throw IPCClientError.connectionFailed("Failed to connect: errno \(err)")
         }
         
         fileDescriptor = fd
-        startReading()
+        shouldStopReader = false
+        state = .connected
+        log("performConnect: connected successfully, fd=\(fd)")
+        
+        startReaderThread()
+    }
+    
+    private func startReaderThread() {
+        let fd = fileDescriptor
+        guard fd >= 0 else { return }
+        
+        let thread = Thread { [weak self] in
+            self?.readerLoop(fd: fd)
+        }
+        thread.name = "quotio.ipc.reader"
+        thread.qualityOfService = .userInitiated
+        readerThread = thread
+        thread.start()
+    }
+    
+    nonisolated private func readerLoop(fd: Int32) {
+        var readBuffer = [UInt8](repeating: 0, count: 8192)
+        var localBuffer = Data()
+        
+        while true {
+            let bytesRead = read(fd, &readBuffer, readBuffer.count)
+            
+            if bytesRead > 0 {
+                localBuffer.append(contentsOf: readBuffer[0..<bytesRead])
+                
+                while let newlineIndex = localBuffer.firstIndex(of: 0x0A) {
+                    let messageData = Data(localBuffer[localBuffer.startIndex..<newlineIndex])
+                    localBuffer = Data(localBuffer[localBuffer.index(after: newlineIndex)...])
+                    
+                    Task { [weak self] in
+                        await self?.handleMessage(messageData)
+                    }
+                }
+            } else if bytesRead == 0 {
+                NSLog("[DaemonIPCClient] readerLoop: EOF received")
+                Task { [weak self] in
+                    await self?.handleDisconnect(error: nil)
+                }
+                break
+            } else {
+                let err = errno
+                if err == EINTR {
+                    continue
+                }
+                NSLog("[DaemonIPCClient] readerLoop: read error errno=%d", err)
+                Task { [weak self] in
+                    await self?.handleDisconnect(error: IPCClientError.connectionFailed("Read error: \(err)"))
+                }
+                break
+            }
+        }
     }
     
     func disconnect() {
-        readTask?.cancel()
-        readTask = nil
+        guard fileDescriptor >= 0 else { return }
+        
+        log("disconnect: closing connection")
+        
+        shouldStopReader = true
         
         if fileDescriptor >= 0 {
-            close(fileDescriptor)
+            Darwin.close(fileDescriptor)
             fileDescriptor = -1
         }
         
-        buffer = Data()
-        for (_, continuation) in pendingRequests {
-            continuation.resume(throwing: IPCClientError.disconnected)
-        }
+        let pending = pendingRequests
         pendingRequests.removeAll()
+        for (id, request) in pending {
+            log("disconnect: failing pending request id=\(id) method=\(request.method)")
+            request.timeoutTask.cancel()
+            request.continuation.resume(throwing: IPCClientError.disconnected)
+        }
+        
+        buffer = Data()
+        state = .disconnected
+        log("disconnect: completed")
+    }
+    
+    private func handleMessage(_ data: Data) {
+        struct IdExtractor: Decodable {
+            let id: Int?
+        }
+        
+        do {
+            let idInfo = try JSONDecoder().decode(IdExtractor.self, from: data)
+            guard let id = idInfo.id else {
+                log("handleMessage: no id field, len=\(data.count)")
+                return
+            }
+            
+            guard let pending = pendingRequests.removeValue(forKey: id) else {
+                log("handleMessage: stale response for id=\(id), pending=\(pendingRequests.count)")
+                return
+            }
+            
+            let elapsed = Date().timeIntervalSince(pending.createdAt)
+            log("handleMessage: matched response for id=\(id) method=\(pending.method) elapsed=\(String(format: "%.2f", elapsed))s")
+            pending.timeoutTask.cancel()
+            pending.continuation.resume(returning: data)
+        } catch {
+            let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<binary>"
+            log("handleMessage: decode error=\(error), len=\(data.count), preview=\(preview)")
+        }
+    }
+    
+    private func handleDisconnect(error: Error?) {
+        if case .connected = state {
+            log("handleDisconnect: connection lost, error=\(error?.localizedDescription ?? "none")")
+            disconnect()
+        }
     }
     
     func call<P: Encodable & Sendable, R: Decodable & Sendable>(
@@ -93,6 +261,11 @@ actor DaemonIPCClient {
         params: P
     ) async throws -> R {
         try await connect()
+        
+        let fd = fileDescriptor
+        guard fd >= 0 else {
+            throw IPCClientError.notConnected
+        }
         
         requestIdCounter += 1
         let id = requestIdCounter
@@ -102,25 +275,34 @@ actor DaemonIPCClient {
         var data = try encoder.encode(request)
         data.append(0x0A)
         
-        guard fileDescriptor >= 0 else {
-            throw IPCClientError.notConnected
-        }
-        
-        let written = data.withUnsafeBytes { ptr in
-            write(fileDescriptor, ptr.baseAddress, ptr.count)
-        }
-        
-        guard written == data.count else {
-            throw IPCClientError.connectionFailed("Failed to write data")
-        }
+        log("call: id=\(id) method=\(method.rawValue)")
         
         let responseData: Data = try await withCheckedThrowingContinuation { continuation in
-            pendingRequests[id] = continuation
+            let timeoutNanos = UInt64(timeout) * 1_000_000_000
+            let timeoutTask = Task { [weak self] in
+                do {
+                    try await Task.sleep(nanoseconds: timeoutNanos)
+                    await self?.handleTimeout(id: id)
+                } catch {}
+            }
             
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                if let pending = pendingRequests.removeValue(forKey: id) {
-                    pending.resume(throwing: IPCClientError.timeout)
+            let pending = PendingRequest(
+                continuation: continuation,
+                timeoutTask: timeoutTask,
+                method: method.rawValue,
+                createdAt: Date()
+            )
+            pendingRequests[id] = pending
+            
+            let written = data.withUnsafeBytes { ptr in
+                write(fd, ptr.baseAddress, ptr.count)
+            }
+            
+            if written != data.count {
+                if pendingRequests.removeValue(forKey: id) != nil {
+                    timeoutTask.cancel()
+                    log("call: write failed for id=\(id), written=\(written) expected=\(data.count)")
+                    continuation.resume(throwing: IPCClientError.connectionFailed("Write failed"))
                 }
             }
         }
@@ -129,6 +311,7 @@ actor DaemonIPCClient {
         let response = try decoder.decode(IPCResponse<R>.self, from: responseData)
         
         if let error = response.error {
+            log("call: id=\(id) returned error: \(error.message)")
             throw error
         }
         
@@ -136,58 +319,28 @@ actor DaemonIPCClient {
             throw IPCClientError.noResult
         }
         
+        log("call: id=\(id) completed successfully")
         return result
+    }
+    
+    private func handleTimeout(id: Int) {
+        if let pending = pendingRequests.removeValue(forKey: id) {
+            let elapsed = Date().timeIntervalSince(pending.createdAt)
+            log("handleTimeout: id=\(id) method=\(pending.method) elapsed=\(String(format: "%.2f", elapsed))s")
+            pending.continuation.resume(throwing: IPCClientError.timeout)
+        }
     }
     
     func call<R: Decodable & Sendable>(_ method: IPCMethod) async throws -> R {
         try await call(method, params: IPCEmptyParams())
     }
     
-    private func startReading() {
-        let fd = fileDescriptor
-        guard fd >= 0 else { return }
-        
-        readTask = Task.detached { [weak self] in
-            var readBuffer = [UInt8](repeating: 0, count: 4096)
-            
-            while !Task.isCancelled {
-                let bytesRead = read(fd, &readBuffer, readBuffer.count)
-                
-                if bytesRead <= 0 {
-                    await self?.disconnect()
-                    break
-                }
-                
-                let data = Data(readBuffer[0..<bytesRead])
-                await self?.handleData(data)
-            }
-        }
-    }
-    
-    private func handleData(_ data: Data) {
-        buffer.append(data)
-        
-        while let newlineIndex = buffer.firstIndex(of: 0x0A) {
-            let messageData = buffer[buffer.startIndex..<newlineIndex]
-            buffer = Data(buffer[buffer.index(after: newlineIndex)...])
-            processMessage(Data(messageData))
-        }
-    }
-    
-    private func processMessage(_ data: Data) {
-        struct IdExtractor: Decodable {
-            let id: Int?
-        }
-        
-        guard let idInfo = try? JSONDecoder().decode(IdExtractor.self, from: data),
-              let id = idInfo.id,
-              let continuation = pendingRequests.removeValue(forKey: id) else {
-            return
-        }
-        
-        continuation.resume(returning: data)
+    private nonisolated func log(_ message: String) {
+        NSLog("[DaemonIPCClient] %@", message)
     }
 }
+
+// MARK: - Convenience Methods
 
 extension DaemonIPCClient {
     func ping() async throws -> IPCDaemonPingResult {
@@ -390,6 +543,8 @@ extension DaemonIPCClient {
         try await call(.statsGet)
     }
 }
+
+// MARK: - Error Types
 
 enum IPCClientError: LocalizedError {
     case daemonNotRunning
