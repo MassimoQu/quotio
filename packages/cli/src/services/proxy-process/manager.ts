@@ -1,9 +1,10 @@
 import type { Subprocess } from "bun";
 import {
-	getProxyBinaryPath,
-	getProxyConfigPath,
+	DEFAULT_PROXY_PORT,
+	getConfigDir,
+	getProxyDataDir,
 	getProxyPidPath,
-} from "../proxy-binary/constants.ts";
+} from "../proxy-server/constants.ts";
 import { ensureConfigExists } from "./config.ts";
 
 export interface ProxyProcessState {
@@ -17,7 +18,7 @@ let currentProcess: Subprocess | null = null;
 let processState: ProxyProcessState = {
 	running: false,
 	pid: null,
-	port: 8217,
+	port: DEFAULT_PROXY_PORT,
 	startedAt: null,
 };
 
@@ -25,27 +26,37 @@ export function getProcessState(): ProxyProcessState {
 	return { ...processState };
 }
 
-export async function startProxy(port = 8217): Promise<void> {
+/**
+ * Start the Quotio server (TypeScript).
+ * Uses bun to run the server from @quotio/server package.
+ */
+export async function startProxy(port = DEFAULT_PROXY_PORT): Promise<void> {
 	if (processState.running) {
-		throw new Error("Proxy is already running");
+		throw new Error("Server is already running");
 	}
 
-	const binaryPath = getProxyBinaryPath();
-	const binaryFile = Bun.file(binaryPath);
-	if (!(await binaryFile.exists())) {
+	await ensureDirectories();
+	await cleanupOrphanProcesses(port);
+	await ensureConfigExists(port);
+
+	// Find the server entry point
+	const serverPath = await findServerPath();
+	if (!serverPath) {
 		throw new Error(
-			`Proxy binary not found at ${binaryPath}. Run 'quotio proxy install' first.`,
+			"Could not find @quotio/server. Make sure the package is installed.",
 		);
 	}
 
-	await cleanupOrphanProcesses(port);
-	const configPath = await ensureConfigExists(port);
-
-	currentProcess = Bun.spawn([binaryPath, "-config", configPath], {
-		cwd: new URL(".", `file://${binaryPath}`).pathname,
+	// Start the server using bun
+	currentProcess = Bun.spawn(["bun", "run", serverPath], {
+		cwd: getProxyDataDir(),
 		stdout: "pipe",
 		stderr: "pipe",
-		env: { ...process.env, TERM: "xterm-256color" },
+		env: {
+			...process.env,
+			PORT: String(port),
+			NODE_ENV: "production",
+		},
 	});
 
 	if (currentProcess.stdout && typeof currentProcess.stdout !== "number") {
@@ -65,23 +76,50 @@ export async function startProxy(port = 8217): Promise<void> {
 		startedAt: new Date(),
 	};
 
-	await Bun.sleep(1500);
+	// Wait for server to be ready
+	await Bun.sleep(2000);
 
 	if (currentProcess.exitCode !== null) {
 		processState.running = false;
 		processState.pid = null;
 		throw new Error(
-			`Proxy failed to start (exit code: ${currentProcess.exitCode})`,
+			`Server failed to start (exit code: ${currentProcess.exitCode})`,
 		);
 	}
 
 	const healthy = await checkHealth(port);
 	if (!healthy) {
 		await stopProxy();
-		throw new Error("Proxy started but health check failed");
+		throw new Error("Server started but health check failed");
 	}
 
 	setupProcessWatcher();
+}
+
+async function findServerPath(): Promise<string | null> {
+	// Try to find @quotio/server in various locations
+	const possiblePaths = [
+		// In monorepo development
+		new URL("../../../../server/src/index.ts", import.meta.url).pathname,
+		// Compiled server
+		new URL("../../../../server/dist/quotio-server", import.meta.url).pathname,
+	];
+
+	for (const path of possiblePaths) {
+		const file = Bun.file(path);
+		if (await file.exists()) {
+			return path;
+		}
+	}
+
+	return null;
+}
+
+async function ensureDirectories(): Promise<void> {
+	const dirs = [getProxyDataDir(), getConfigDir()];
+	for (const dir of dirs) {
+		await Bun.spawn(["mkdir", "-p", dir]).exited;
+	}
 }
 
 export async function stopProxy(): Promise<void> {
@@ -125,7 +163,7 @@ export async function restartProxy(port?: number): Promise<void> {
 	await startProxy(currentPort);
 }
 
-export async function checkHealth(port = 8217): Promise<boolean> {
+export async function checkHealth(port = DEFAULT_PROXY_PORT): Promise<boolean> {
 	try {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -164,7 +202,7 @@ function setupProcessWatcher(): void {
 		currentProcess = null;
 
 		if (exitCode !== 0) {
-			console.error(`[quotio] Proxy exited with code ${exitCode}`);
+			console.error(`[quotio] Server exited with code ${exitCode}`);
 		}
 	});
 }

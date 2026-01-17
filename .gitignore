@@ -6,10 +6,8 @@
 DEVELOPMENT_PLAN.md
 plans/
 
-# quotio-cli (Bun/TS project)
-quotio-cli/node_modules/
-quotio-cli/quotio
-quotio-cli/*.log
+# CLI dist output
+packages/cli/dist/
 
 # Local AI agent context (not shared)
 .context/

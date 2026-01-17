@@ -1,26 +1,45 @@
 # AGENTS.md - Quotio Development Guidelines
 
-**Generated:** 2026-01-03 | **Commit:** 1995a85 | **Branch:** master
+**Generated:** 2026-01-17 | **Commit:** dev | **Branch:** dev
 
 ## Overview
 
-Native macOS menu bar app (SwiftUI) for managing CLIProxyAPI - local proxy server for AI coding agents. Multi-provider OAuth, quota tracking, CLI tool configuration.
+Native macOS menu bar app (SwiftUI) for managing the Quotio proxy server - local proxy server for AI coding agents. Multi-provider OAuth, quota tracking, CLI tool configuration.
 
-**Stack:** Swift 6, SwiftUI, macOS 15+, Xcode 16+, Sparkle (auto-update)
+**Stack:** 
+- **macOS App:** Swift 6, SwiftUI, macOS 15+, Xcode 16+, Sparkle (auto-update)
+- **Monorepo:** Turborepo + Bun + TypeScript
+- **Packages:** @quotio/server (Hono), @quotio/cli (Bun), @quotio/core (shared types)
 
 ## Structure
 
 ```
-Quotio/
+Quotio/                       # Swift macOS app
 ├── QuotioApp.swift           # @main entry + AppDelegate + ContentView
 ├── Models/                   # Enums, Codable structs, settings managers
-├── Services/                 # Business logic, API clients, actors (→ AGENTS.md)
+├── Services/                 # Business logic, API clients, actors
 ├── ViewModels/               # @Observable state (QuotaViewModel, AgentSetupViewModel)
-├── Views/Components/         # Reusable UI (→ Views/AGENTS.md)
+├── Views/Components/         # Reusable UI
 ├── Views/Screens/            # Full-page views
 └── Assets.xcassets/          # Icons (provider icons, menu bar icons)
+
+packages/                     # TypeScript monorepo
+├── core/                     # Shared types and models (@quotio/core)
+├── cli/                      # CLI tool (@quotio/cli) - quotio command
+│   └── src/
+│       ├── cli/commands/     # Command handlers
+│       ├── services/         # Business logic
+│       │   ├── proxy-server/ # Server paths and constants
+│       │   └── proxy-process/# Process lifecycle management
+│       └── utils/            # Helpers
+└── server/                   # Proxy server (@quotio/server) - TypeScript/Hono
+    └── src/
+        ├── routes/           # API routes (OpenAI-compatible)
+        ├── services/         # Auth, provider routing, quota
+        └── utils/            # Helpers
+
 Config/                       # .xcconfig files (Debug/Release/Local)
-scripts/                      # Build, release, notarize (→ AGENTS.md)
+scripts/                      # Build, release, notarize
 docs/                         # Architecture docs
 ```
 
@@ -54,7 +73,7 @@ docs/                         # Architecture docs
 
 ## Daemon Architecture
 
-The Swift app communicates with CLIProxyAPI exclusively through the quotio-cli daemon via Unix socket IPC.
+The Swift app communicates with the proxy server exclusively through the quotio-cli daemon via Unix socket IPC.
 
 ### Architecture Diagram
 
@@ -87,7 +106,7 @@ The Swift app communicates with CLIProxyAPI exclusively through the quotio-cli d
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     CLIProxyAPI (Go binary)                      │
+│                  @quotio/server (TypeScript/Hono)                │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐ │
 │  │ Proxy Server     │  │ Auth Management  │  │ Request Routing│ │
 │  └──────────────────┘  └──────────────────┘  └────────────────┘ │
@@ -120,7 +139,7 @@ The Swift app communicates with CLIProxyAPI exclusively through the quotio-cli d
 | `DaemonIPCClient.swift` | Services/Daemon/ | Unix socket client, method wrappers |
 | `DaemonProxyConfigService.swift` | Services/Daemon/ | Proxy config operations |
 | `DaemonAPIKeysService.swift` | Services/Daemon/ | API key operations |
-| `service.ts` | quotio-cli/src/services/daemon/ | IPC request handlers |
+| `service.ts` | packages/cli/src/services/daemon/ | IPC request handlers |
 
 ## Fallback Architecture
 
@@ -202,8 +221,8 @@ quotio fallback import < backup.json
 | `FallbackSettingsManager.swift` | Services/ | File-based config, file watcher, UserDefaults migration |
 | `FallbackModels.swift` | Models/ | `VirtualModel`, `FallbackEntry`, `FallbackConfiguration` |
 | `FallbackFormatConverter.swift` | Services/Proxy/ | Provider-specific request format conversion |
-| `quotio-cli/src/models/fallback.ts` | quotio-cli | TypeScript fallback types |
-| `quotio-cli/src/services/fallback/` | quotio-cli | Settings service + IPC handlers |
+| `packages/cli/src/models/fallback.ts` | packages/cli | TypeScript fallback types |
+| `packages/cli/src/services/fallback/` | packages/cli | Settings service + IPC handlers |
 
 ### Request Flow
 
@@ -213,7 +232,7 @@ CLI Tool (Claude/Cursor)
         - Checks fallback config
         - Uses FallbackFormatConverter for format conversion
         - Handles retry on 429/5xx with next provider
-    → CLIProxyAPI (port 18317)
+    → @quotio/server (port 18317)
     → AI Provider (OpenAI/Anthropic/etc.)
 ```
 

@@ -1,5 +1,4 @@
 import { ManagementAPIClient } from "../../../services/management-api.ts";
-import { getBinaryInfo } from "../../../services/proxy-binary/index.ts";
 import {
 	checkHealth,
 	getProcessState,
@@ -14,7 +13,6 @@ export async function proxyStatus(
 	ctx: CLIContext,
 ): Promise<CommandResult> {
 	try {
-		const binaryInfo = await getBinaryInfo();
 		const managedRunning = await isProxyRunning();
 		const managedPid = await getProxyPid();
 		const managedState = getProcessState();
@@ -34,12 +32,6 @@ export async function proxyStatus(
 		}
 
 		const status = {
-			binary: {
-				installed: binaryInfo.exists,
-				path: binaryInfo.path,
-				version: binaryInfo.version || null,
-				executable: binaryInfo.isExecutable,
-			},
 			process: {
 				running: managedRunning || healthy,
 				pid: managedPid,
@@ -63,8 +55,6 @@ export async function proxyStatus(
 			return { success: true, data: status };
 		}
 
-		printBinarySection(binaryInfo);
-		logger.print("");
 		printProcessSection(
 			managedRunning,
 			healthy,
@@ -80,24 +70,8 @@ export async function proxyStatus(
 		const message = error instanceof Error ? error.message : String(error);
 		return {
 			success: false,
-			message: `Failed to get proxy status: ${message}`,
+			message: `Failed to get server status: ${message}`,
 		};
-	}
-}
-
-function printBinarySection(binaryInfo: {
-	exists: boolean;
-	path: string;
-	version: string;
-}): void {
-	logger.print(colors.bold("Binary:"));
-	if (binaryInfo.exists) {
-		logger.print(`  Status: ${colors.green("Installed")}`);
-		logger.print(`  Path: ${binaryInfo.path}`);
-		logger.print(`  Version: ${binaryInfo.version || "unknown"}`);
-	} else {
-		logger.print(`  Status: ${colors.red("Not installed")}`);
-		logger.print("  Run: quotio proxy install");
 	}
 }
 
@@ -108,7 +82,7 @@ function printProcessSection(
 	managedState: { port: number; startedAt: Date | null },
 	port: number,
 ): void {
-	logger.print(colors.bold("Process:"));
+	logger.print(colors.bold("Server:"));
 	if (managedRunning || healthy) {
 		logger.print(`  Status: ${colors.green("Running")}`);
 		logger.print(`  PID: ${managedPid ?? "unknown (external)"}`);

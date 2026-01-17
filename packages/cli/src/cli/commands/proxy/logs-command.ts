@@ -1,6 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { getProxyLogDir } from "../../../services/proxy-binary/constants.ts";
+import { getProxyLogDir } from "../../../services/proxy-server/constants.ts";
 import { colors, logger } from "../../../utils/index.ts";
 import type { CLIContext, CommandResult } from "../../index.ts";
 
@@ -16,7 +16,7 @@ export async function proxyLogs(
 	} catch {
 		logger.print(colors.dim("No log directory found."));
 		logger.print(`\nExpected at: ${logDir}`);
-		logger.print("Start the proxy first: quotio proxy start");
+		logger.print("Start the server first: quotio proxy start");
 		return { success: true, data: { logs: [] } };
 	}
 

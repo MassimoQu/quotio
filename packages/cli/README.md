@@ -1,15 +1,15 @@
-# quotio-cli
+# @quotio/cli
 
-Cross-platform CLI tool for managing CLIProxyAPI - the local proxy server for AI coding agents.
+Cross-platform CLI tool for managing the Quotio proxy server - a local proxy for AI coding agents.
 
-quotio-cli is the command-line companion to the Quotio macOS app, allowing you to manage quota tracking, authentication, and agent configuration on any platform that supports the Bun runtime.
+@quotio/cli is the command-line companion to the Quotio macOS app, allowing you to manage quota tracking, authentication, and agent configuration on any platform that supports the Bun runtime.
 
 ## Features
 
 - **Quota Management**: Track usage across multiple AI providers including Claude Code, Gemini CLI, and GitHub Copilot.
 - **Authentication**: Manage OAuth tokens and API keys for your AI accounts.
-- **Proxy Control**: Start, stop, and monitor the local CLIProxyAPI server instance.
-- **Embedded Proxy Binary**: CLIProxyAPI binary bundled for standalone operation.
+- **Proxy Control**: Start, stop, and monitor the @quotio/server proxy instance.
+- **TypeScript Server**: Pure TypeScript proxy server (no external binary required).
 - **Agent Configuration**: Automatically detect and configure CLI tools to use the proxy.
 - **Cross-Platform**: Runs on macOS (ARM64/x64), Linux (ARM64/x64), and Windows (x64).
 
@@ -24,22 +24,15 @@ quotio-cli is the command-line companion to the Quotio macOS app, allowing you t
 1. Clone the repository:
    ```bash
    git clone https://github.com/nguyenphutrong/quotio.git
-   cd quotio/quotio-cli
+   cd quotio/packages/cli
    ```
 
-2. Install dependencies:
+2. Install dependencies (from monorepo root):
    ```bash
    bun install
    ```
 
-3. Download the proxy binary for your platform:
-   ```bash
-   bun run download-proxy:current
-   # Or for all platforms:
-   bun run download-proxy -- --all
-   ```
-
-4. Build the binary:
+3. Build the CLI:
    ```bash
    bun run build
    # Or for all platforms:
@@ -66,7 +59,7 @@ bun run dev <command> [options]
 
 - `--format <type>`: Output format (table, json, plain). Default: table.
 - `--verbose, -v`: Enable verbose output.
-- `--base-url <url>`: CLIProxyAPI base URL. Default: http://localhost:8217.
+- `--base-url <url>`: Proxy server base URL. Default: http://localhost:8217.
 - `--help, -h`: Show help for a command.
 
 ## Commands
@@ -97,12 +90,9 @@ quotio auth login --provider gemini
 
 ### Proxy Control
 
-Manage the local proxy server process and binary.
+Manage the local proxy server process.
 
 ```bash
-# Install the proxy binary
-quotio proxy install
-
 # Start the proxy server
 quotio proxy start
 # Start on a custom port
@@ -114,14 +104,15 @@ quotio proxy stop
 # Restart the proxy server
 quotio proxy restart
 
-# Check proxy status (binary path, process PID, health)
+# Check proxy status (process PID, health)
 quotio proxy status
 
 # Quick health check
 quotio proxy health
 
-# Remove the proxy binary
-quotio proxy uninstall
+# View proxy logs
+quotio proxy logs
+quotio proxy logs -f  # Follow mode
 ```
 
 ### Agent Configuration
@@ -154,18 +145,30 @@ quotio agent configure --name claude-code
 - `bun run dev`: Run the CLI in development mode.
 - `bun run build`: Compile the CLI into a single binary for the current platform.
 - `bun run build:all`: Compile the CLI for all supported platforms.
-- `bun run download-proxy`: Download the CLIProxyAPI binary for the current platform.
 - `bun run lint`: Run the linter to check for code style issues.
 - `bun run format`: Format the code using the project's style guide.
+- `bun run typecheck`: Type-check the codebase.
 
 ### Project Structure
 
 - `src/cli`: Command definitions and handlers.
 - `src/models`: TypeScript interfaces and data models.
 - `src/services`: Core business logic.
-  - `proxy-binary`: Management of the embedded CLIProxyAPI binary.
+  - `proxy-server`: Server paths and constants.
   - `proxy-process`: Lifecycle management for the proxy server process.
 - `src/utils`: Helper functions.
+
+### Architecture
+
+The CLI spawns the `@quotio/server` package as a subprocess using Bun:
+
+```
+quotio proxy start
+    → spawns: bun run --cwd packages/server src/index.ts
+    → @quotio/server listens on port 18317
+```
+
+No external binary download is required - the proxy server is pure TypeScript.
 
 ## License
 

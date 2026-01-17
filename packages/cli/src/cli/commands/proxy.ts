@@ -7,13 +7,11 @@ import {
 } from "../index.ts";
 import {
 	healthCheck,
-	proxyInstall,
 	proxyLogs,
 	proxyRestart,
 	proxyStart,
 	proxyStatus,
 	proxyStop,
-	proxyUninstall,
 } from "./proxy/index.ts";
 
 async function handleProxy(
@@ -49,10 +47,6 @@ async function handleProxy(
 			return await proxyStop(ctx);
 		case "restart":
 			return await proxyRestart(port, ctx);
-		case "install":
-			return await proxyInstall(ctx);
-		case "uninstall":
-			return await proxyUninstall(ctx);
 		case "status":
 			return await proxyStatus(port, ctx);
 		case "health":
@@ -80,8 +74,6 @@ Subcommands:
   start         Start the proxy server
   stop          Stop the proxy server
   restart       Restart the proxy server
-  install       Extract and install the proxy binary
-  uninstall     Remove the installed proxy binary
   logs          View proxy server logs
 
 Options:
@@ -96,7 +88,6 @@ Examples:
   quotio proxy start -p 9000      # Start on port 9000
   quotio proxy stop               # Stop the proxy
   quotio proxy restart            # Restart the proxy
-  quotio proxy install            # Install the embedded binary
   quotio proxy logs               # Show last 50 log lines
   quotio proxy logs -n 100        # Show last 100 log lines
   quotio proxy logs -f            # Tail logs in real-time

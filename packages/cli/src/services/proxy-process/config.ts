@@ -1,8 +1,12 @@
 import {
 	getAuthDir,
-	getProxyConfigPath,
+	getConfigDir,
 	getProxyLogDir,
-} from "../proxy-binary/constants.ts";
+} from "../proxy-server/constants.ts";
+
+function getProxyConfigPath(): string {
+	return `${getConfigDir()}/server.json`;
+}
 
 export interface ProxyConfig {
 	host: string;
