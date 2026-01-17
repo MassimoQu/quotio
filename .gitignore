@@ -1,13 +1,32 @@
+# ========================================
+# PROJECT-SPECIFIC
+# ========================================
+
+# Development plan (internal docs)
 DEVELOPMENT_PLAN.md
+plans/
+
+# quotio-cli (Bun/TS project)
+quotio-cli/node_modules/
+quotio-cli/quotio
+quotio-cli/*.log
+
+# Local AI agent context (not shared)
+.context/
+.wallpaper-cache/
+.sisyphus/
+
+# ========================================
+# BUILD & ARTIFACTS
+# ========================================
+
+# Build output
 build/
+dist/
+out/
+*.tgz
 
-# Sparkle private key - NEVER COMMIT
-.sparkle_private_key
-
-# Sparkle tools
-.sparkle/
-
-# Release artifacts
+# macOS app build artifacts
 *.dmg
 *.zip
 appcast.xml
@@ -21,21 +40,90 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 
-# Build logs
-*.log
+# Sparkle auto-update (private key - NEVER COMMIT)
+.sparkle_private_key
+.sparkle/
 
-# Local development configuration (contains dev-specific overrides)
+# ========================================
+# CONFIGURATION
+# ========================================
+
+# Local development configuration (dev-specific overrides)
 Config/Local.xcconfig
 
-plans/
+# Environment variables (never commit secrets)
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
 
-# Local AI agent context (not shared)
-.context/
-.wallpaper-cache/
+# ========================================
+# IDE & EDITOR
+# ========================================
 
+# Xcode
+*.xcuserstate
+*.xcuserdatad
+
+# IntelliJ based IDEs
+.idea/
+
+# VS Code
+.vscode/
+
+# ========================================
+# SYSTEM & OS
+# ========================================
+
+# macOS Finder
 .DS_Store
+.DS_Store?
 
-# quotio-cli
-quotio-cli/node_modules/
-quotio-cli/quotio
-quotio-cli/*.log
+# macOS Spotlight
+.Trashes
+._*
+
+# macOS Thumbnail Cache
+ehthumbs.db
+Thumbs.db
+
+# ========================================
+# CACHES & TEMP
+# ========================================
+
+# Build info
+*.log
+logs/
+_.log
+*.tsbuildinfo
+
+# Code coverage
+coverage/
+*.lcov
+
+# Test reports
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# ESLint
+.eslintcache
+
+# Generic cache
+.cache/
+
+# ========================================
+# DEPENDENCIES (if used)
+# ========================================
+
+# Node.js
+node_modules/
+
+# Bun
+bun.lockb
+
+# ========================================
+# OTHER
+# ========================================
+
+# dotfiles backup
+*~
