@@ -290,10 +290,9 @@ struct RemoteConnectionSheet: View {
         testResult = nil
         
         let sanitizedURL = RemoteURLValidator.sanitize(endpointURL)
-        let daemonClient = DaemonIPCClient.shared
         
         do {
-            let result = try await daemonClient.remoteTestConnection(
+            let result = try await QuotioAPIClient.shared.remoteTestConnection(
                 endpointURL: sanitizedURL,
                 managementKey: managementKey,
                 timeoutSeconds: timeoutSeconds
@@ -301,7 +300,7 @@ struct RemoteConnectionSheet: View {
             
             testResult = RemoteTestResult(
                 success: result.success,
-                message: result.success ? nil : (result.error ?? "remote.test.cannotConnect".localized())
+                message: result.success ? nil : "remote.test.cannotConnect".localized()
             )
         } catch {
             testResult = RemoteTestResult(

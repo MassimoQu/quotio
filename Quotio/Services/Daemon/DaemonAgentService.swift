@@ -14,20 +14,21 @@ final class DaemonAgentService {
     private(set) var agents: [AgentStatus] = []
     private(set) var lastDetected: Date?
     
-    private let ipcClient = DaemonIPCClient.shared
-    private let daemonManager = DaemonManager.shared
+    private let apiClient = QuotioAPIClient.shared
     
     private init() {}
+    
+    private func ensureConnected() async throws {
+        try await apiClient.connect()
+    }
     
     // MARK: - Agent Detection
     
     func detectAllAgents(forceRefresh: Bool = false) async -> [AgentStatus] {
-        var isDaemonReady = daemonManager.isRunning
-        if !isDaemonReady {
-            isDaemonReady = await daemonManager.checkHealth()
-        }
-        guard isDaemonReady else {
-            lastError = "Daemon not running"
+        do {
+            try await ensureConnected()
+        } catch {
+            lastError = "Server not running"
             return []
         }
         
@@ -36,7 +37,7 @@ final class DaemonAgentService {
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.detectAgents(forceRefresh: forceRefresh)
+            let result = try await apiClient.detectAgents(forceRefresh: forceRefresh)
             agents = convertAgents(result.agents)
             lastDetected = Date()
             return agents
@@ -52,12 +53,10 @@ final class DaemonAgentService {
         agent: CLIAgent,
         mode: ConfigurationMode
     ) async -> AgentConfigResult? {
-        var isDaemonReady = daemonManager.isRunning
-        if !isDaemonReady {
-            isDaemonReady = await daemonManager.checkHealth()
-        }
-        guard isDaemonReady else {
-            lastError = "Daemon not running"
+        do {
+            try await ensureConnected()
+        } catch {
+            lastError = "Server not running"
             return nil
         }
         
@@ -66,7 +65,7 @@ final class DaemonAgentService {
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.configureAgent(
+            let result = try await apiClient.configureAgent(
                 agent: agent.rawValue,
                 mode: mode.rawValue
             )
@@ -78,11 +77,11 @@ final class DaemonAgentService {
                     type: agent.configType,
                     mode: mode,
                     configPath: result.configPath,
-                    instructions: "Configured via daemon",
+                    instructions: result.instructions,
                     backupPath: result.backupPath
                 )
             } else {
-                return AgentConfigResult.failure(error: "Configuration failed")
+                return AgentConfigResult.failure(error: result.error ?? "Configuration failed")
             }
         } catch {
             lastError = error.localizedDescription
@@ -110,17 +109,17 @@ final class DaemonAgentService {
     
     // MARK: - Conversion
     
-    private func convertAgents(_ ipcAgents: [IPCDetectedAgent]) -> [AgentStatus] {
-        ipcAgents.compactMap { ipcAgent in
-            guard let agent = CLIAgent(rawValue: ipcAgent.id) else { return nil }
+    private func convertAgents(_ apiAgents: [AgentInfoAPI]) -> [AgentStatus] {
+        apiAgents.compactMap { apiAgent in
+            guard let agent = CLIAgent(rawValue: apiAgent.id) else { return nil }
             
             return AgentStatus(
                 agent: agent,
-                installed: ipcAgent.installed,
-                configured: ipcAgent.configured,
-                binaryPath: ipcAgent.binaryPath,
-                version: ipcAgent.version,
-                lastConfigured: nil // daemon doesn't track this currently
+                installed: apiAgent.installed,
+                configured: apiAgent.configured,
+                binaryPath: nil,
+                version: apiAgent.version,
+                lastConfigured: nil
             )
         }.sorted { $0.agent.displayName < $1.agent.displayName }
     }

@@ -14,59 +14,38 @@ final class DaemonQuotaService {
     private(set) var quotas: [AIProvider: [String: ProviderQuotaData]] = [:]
     private(set) var lastFetched: Date?
     
-    private let ipcClient = DaemonIPCClient.shared
-    private let daemonManager = DaemonManager.shared
+    private let apiClient = QuotioAPIClient.shared
     
     private init() {}
     
+    private func ensureConnected() async throws {
+        try await apiClient.connect()
+    }
+    
     func fetchAllQuotas(forceRefresh: Bool = false) async {
-        var isDaemonReady = daemonManager.isRunning
-        if !isDaemonReady {
-            isDaemonReady = await daemonManager.checkHealth()
-        }
-        guard isDaemonReady else {
-            lastError = "Daemon not running"
-            return
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.fetchQuotas(forceRefresh: forceRefresh)
-            
-            if result.success {
-                quotas = convertQuotas(result.quotas)
-                lastFetched = Date()
-            }
-            
-            if let errors = result.errors, !errors.isEmpty {
-                lastError = errors.map { "\($0.provider): \($0.error)" }.joined(separator: ", ")
-            }
+            try await ensureConnected()
+            let result = try await apiClient.fetchQuotas(forceRefresh: forceRefresh)
+            quotas = convertQuotas(result.quotas)
+            lastFetched = Date()
         } catch {
             lastError = error.localizedDescription
         }
     }
     
     func fetchQuotas(for provider: AIProvider, forceRefresh: Bool = false) async -> [String: ProviderQuotaData]? {
-        var isDaemonReady = daemonManager.isRunning
-        if !isDaemonReady {
-            isDaemonReady = await daemonManager.checkHealth()
-        }
-        guard isDaemonReady else {
-            return nil
-        }
-        
         do {
-            let result = try await ipcClient.fetchQuotas(provider: provider.rawValue, forceRefresh: forceRefresh)
+            try await ensureConnected()
+            let result = try await apiClient.fetchQuotas(provider: provider.rawValue, forceRefresh: forceRefresh)
             
-            if result.success {
-                let converted = convertQuotas(result.quotas)
-                if let providerQuotas = converted[provider] {
-                    quotas[provider] = providerQuotas
-                    return providerQuotas
-                }
+            let converted = convertQuotas(result.quotas)
+            if let providerQuotas = converted[provider] {
+                quotas[provider] = providerQuotas
+                return providerQuotas
             }
         } catch {}
         
@@ -74,50 +53,48 @@ final class DaemonQuotaService {
     }
     
     func listCachedQuotas() async -> [AIProvider: [String: ProviderQuotaData]] {
-        var isDaemonReady = daemonManager.isRunning
-        if !isDaemonReady {
-            isDaemonReady = await daemonManager.checkHealth()
-        }
-        guard isDaemonReady else {
-            return [:]
-        }
-        
         do {
-            let result = try await ipcClient.listQuotas()
+            try await ensureConnected()
+            let result = try await apiClient.listQuotas()
             return convertQuotas(result.quotas)
         } catch {
             return [:]
         }
     }
     
-    private func convertQuotas(_ ipcQuotas: [IPCProviderQuotaInfo]) -> [AIProvider: [String: ProviderQuotaData]] {
+    private func convertQuotas(_ apiQuotas: [QuotaInfoAPI]) -> [AIProvider: [String: ProviderQuotaData]] {
         var result: [AIProvider: [String: ProviderQuotaData]] = [:]
         
-        for ipcQuota in ipcQuotas {
-            guard let provider = AIProvider(rawValue: ipcQuota.provider) else { continue }
+        for apiQuota in apiQuotas {
+            guard let provider = AIProvider(rawValue: apiQuota.provider) else { continue }
             
-            let models = ipcQuota.models.map { model in
-                ModelQuota(
-                    name: model.name,
-                    percentage: model.percentage,
-                    resetTime: model.resetTime,
-                    used: model.used,
-                    limit: model.limit
-                )
-            }
-            
-            let lastUpdated = ISO8601DateFormatter().date(from: ipcQuota.lastUpdated) ?? Date()
-            
-            let quotaData = ProviderQuotaData(
-                models: models,
-                lastUpdated: lastUpdated,
-                isForbidden: ipcQuota.isForbidden
+            let percentage = apiQuota.percent_used ?? 0.0
+            let model = ModelQuota(
+                name: "default",
+                percentage: percentage,
+                resetTime: "",
+                used: apiQuota.used.map { Int($0) },
+                limit: apiQuota.limit.map { Int($0) }
             )
             
+            let lastUpdated: Date
+            if let dateString = apiQuota.last_updated {
+                lastUpdated = ISO8601DateFormatter().date(from: dateString) ?? Date()
+            } else {
+                lastUpdated = Date()
+            }
+            
+            let quotaData = ProviderQuotaData(
+                models: [model],
+                lastUpdated: lastUpdated,
+                isForbidden: false
+            )
+            
+            let email = apiQuota.email ?? apiQuota.id
             if result[provider] == nil {
                 result[provider] = [:]
             }
-            result[provider]?[ipcQuota.email] = quotaData
+            result[provider]?[email] = quotaData
         }
         
         return result

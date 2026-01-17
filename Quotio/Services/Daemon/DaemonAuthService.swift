@@ -14,32 +14,25 @@ final class DaemonAuthService {
     private(set) var authAccounts: [IPCAuthAccount] = []
     private(set) var oauthState: DaemonOAuthState?
     
-    private let ipcClient = DaemonIPCClient.shared
-    private let daemonManager = DaemonManager.shared
+    private let apiClient = QuotioAPIClient.shared
     
     private init() {}
     
-    private var isDaemonReady: Bool {
-        get async {
-            if daemonManager.isRunning { return true }
-            return await daemonManager.checkHealth()
-        }
+    private func ensureConnected() async throws {
+        try await apiClient.connect()
     }
     
     func listAuthFiles(provider: String? = nil) async -> [IPCAuthAccount] {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return []
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.listAuth(provider: provider)
-            authAccounts = result.accounts
-            return result.accounts
+            try await ensureConnected()
+            let result = try await apiClient.listAuth(provider: provider)
+            let accounts = result.auth_files.map { convertToIPCAuthAccount($0) }
+            authAccounts = accounts
+            return accounts
         } catch {
             lastError = error.localizedDescription
             return []
@@ -47,16 +40,13 @@ final class DaemonAuthService {
     }
     
     func deleteAuthFile(name: String) async throws {
-        guard await isDaemonReady else {
-            throw DaemonAuthError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.deleteAuth(name: name)
+            try await ensureConnected()
+            let result = try await apiClient.deleteAuth(name: name)
             if !result.success {
                 throw DaemonAuthError.deleteFailed
             }
@@ -68,23 +58,16 @@ final class DaemonAuthService {
     }
     
     func startOAuth(provider: AIProvider, projectId: String? = nil) async throws -> DaemonOAuthState {
-        guard await isDaemonReady else {
-            throw DaemonAuthError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.startOAuth(
-                provider: provider.rawValue,
-                projectId: projectId,
-                isWebUI: true
-            )
+            try await ensureConnected()
+            let result = try await apiClient.startOAuth(provider: provider.rawValue)
             
             let state = DaemonOAuthState(
-                url: result.url,
+                url: result.auth_url,
                 state: result.state,
                 provider: provider,
                 status: .pending
@@ -98,12 +81,16 @@ final class DaemonAuthService {
     }
     
     func pollOAuthStatus(state: String) async throws -> DaemonOAuthPollResult {
-        guard await isDaemonReady else {
-            throw DaemonAuthError.daemonNotRunning
+        guard let currentState = oauthState else {
+            throw DaemonAuthError.oauthFailed("No active OAuth session")
         }
         
         do {
-            let result = try await ipcClient.pollOAuthStatus(state: state)
+            try await ensureConnected()
+            let result = try await apiClient.pollOAuthStatus(
+                provider: currentState.provider.rawValue,
+                state: state
+            )
             
             let status: DaemonOAuthStatus
             switch result.status {
@@ -139,29 +126,19 @@ final class DaemonAuthService {
     // MARK: - Copilot Device Code Authentication
     
     func startCopilotAuth() async -> CopilotAuthResult {
-        guard await isDaemonReady else {
-            return CopilotAuthResult(success: false, message: "Daemon not running")
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.copilotStartDeviceCode()
+            try await ensureConnected()
+            let result = try await apiClient.startDeviceCode(provider: "copilot")
             
-            if result.success {
-                return CopilotAuthResult(
-                    success: true,
-                    deviceCode: result.userCode,
-                    message: "Please complete authentication in browser"
-                )
-            } else {
-                return CopilotAuthResult(
-                    success: false,
-                    message: result.error ?? "Failed to start Copilot authentication"
-                )
-            }
+            return CopilotAuthResult(
+                success: true,
+                deviceCode: result.user_code,
+                message: "Please complete authentication in browser"
+            )
         } catch {
             lastError = error.localizedDescription
             return CopilotAuthResult(success: false, message: error.localizedDescription)
@@ -171,39 +148,33 @@ final class DaemonAuthService {
     // MARK: - Kiro Authentication
     
     func startKiroAuth(method: AuthCommand) async -> KiroAuthResult {
-        guard await isDaemonReady else {
-            return KiroAuthResult(success: false, message: "Daemon not running")
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
+            try await ensureConnected()
+            
             switch method {
             case .kiroGoogleLogin:
-                let result = try await ipcClient.kiroStartGoogle()
-                // Kiro Google OAuth returns a URL to open, not a device code
+                let result = try await apiClient.startOAuth(provider: "kiro")
                 return KiroAuthResult(
-                    success: result.success,
+                    success: true,
                     deviceCode: nil,
-                    message: result.success ? "Check browser for login" : (result.error ?? "Failed to start Google auth")
+                    message: "Check browser for login"
                 )
                 
             case .kiroAWSLogin:
-                let result = try await ipcClient.kiroStartAws()
+                let result = try await apiClient.startDeviceCode(provider: "kiro-aws")
                 return KiroAuthResult(
-                    success: result.success,
-                    deviceCode: result.userCode,
-                    message: result.success ? "Check browser for AWS SSO" : (result.error ?? "Failed to start AWS auth")
+                    success: true,
+                    deviceCode: result.user_code,
+                    message: "Check browser for AWS SSO"
                 )
                 
             case .kiroImport:
-                let result = try await ipcClient.kiroImport()
-                return KiroAuthResult(
-                    success: result.success,
-                    message: result.success ? "Imported \(result.imported) account(s)" : (result.error ?? "Import failed")
-                )
+                // TODO: Implement kiro import endpoint when available
+                return KiroAuthResult(success: false, message: "Kiro import not yet supported via HTTP API")
                 
             default:
                 return KiroAuthResult(success: false, message: "Unsupported Kiro auth method")
@@ -212,6 +183,19 @@ final class DaemonAuthService {
             lastError = error.localizedDescription
             return KiroAuthResult(success: false, message: error.localizedDescription)
         }
+    }
+    
+    // MARK: - Private Helpers
+    
+    private func convertToIPCAuthAccount(_ file: AuthFileInfoAPI) -> IPCAuthAccount {
+        IPCAuthAccount(
+            id: file.id,
+            name: file.name ?? file.id,
+            provider: file.provider,
+            email: file.email,
+            status: file.status ?? "active",
+            disabled: file.disabled
+        )
     }
 }
 

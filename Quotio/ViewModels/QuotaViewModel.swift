@@ -217,17 +217,16 @@ final class QuotaViewModel {
     }
     
     private func initializeFullMode() async {
-        // Always refresh quotas directly first (works without proxy)
         await refreshQuotasUnified()
         
         let autoStartProxy = UserDefaults.standard.bool(forKey: "autoStartProxy")
-        let binaryInstalled = FileManager.default.fileExists(atPath: daemonManager.daemonBinaryPath.path)
+        let serverReachable = await daemonManager.checkHealth()
         
-        NSLog("[QuotaViewModel] initializeFullMode: autoStartProxy=%@, binaryInstalled=%@", 
+        NSLog("[QuotaViewModel] initializeFullMode: autoStartProxy=%@, serverReachable=%@", 
               autoStartProxy ? "true" : "false", 
-              binaryInstalled ? "true" : "false")
+              serverReachable ? "true" : "false")
         
-        if autoStartProxy && binaryInstalled {
+        if autoStartProxy && serverReachable {
             NSLog("[QuotaViewModel] Auto-starting proxy...")
             await startProxy()
             
@@ -241,10 +240,9 @@ final class QuotaViewModel {
             if !autoStartProxy {
                 NSLog("[QuotaViewModel] Skipping proxy auto-start: autoStartProxy is disabled")
             }
-            if !binaryInstalled {
-                NSLog("[QuotaViewModel] Skipping proxy auto-start: binary not installed")
+            if !serverReachable {
+                NSLog("[QuotaViewModel] Skipping proxy auto-start: server not reachable")
             }
-            // If not auto-starting proxy, start quota auto-refresh
             startQuotaAutoRefreshWithoutProxy()
         }
     }
@@ -477,7 +475,7 @@ final class QuotaViewModel {
         refreshTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: intervalNs)
-                _ = try? await DaemonIPCClient.shared.refreshQuotaTokens(provider: "kiro")
+                _ = try? await QuotioAPIClient.shared.refreshQuotaTokens(provider: "kiro")
                 await refreshQuotasDirectly()
             }
         }
@@ -495,7 +493,7 @@ final class QuotaViewModel {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: intervalNs)
                 if !daemonProxyService.isRunning {
-                    _ = try? await DaemonIPCClient.shared.refreshQuotaTokens(provider: "kiro")
+                    _ = try? await QuotioAPIClient.shared.refreshQuotaTokens(provider: "kiro")
                     await refreshQuotasUnified()
                 }
             }
@@ -713,8 +711,6 @@ final class QuotaViewModel {
             }
         }
         
-        let daemonClient = DaemonIPCClient.shared
-        
         for model in models {
             if Task.isCancelled { break }
             do {
@@ -723,8 +719,7 @@ final class QuotaViewModel {
                     status.modelStates[model] = .running
                 }
                 try await warmupService.warmup(
-                    daemonClient: daemonClient,
-                    authIndex: authIndex,
+                    authId: authIndex,
                     model: model
                 )
                 updateWarmupStatus(for: account) { status in
@@ -759,13 +754,10 @@ final class QuotaViewModel {
                     return cached.models
                 }
             }
-            let daemonClient = DaemonIPCClient.shared
-            let models = try await warmupService.fetchModels(daemonClient: daemonClient, authFileName: authFileName)
+            let models = try await warmupService.fetchModels(authId: authFileName)
             warmupModelCache[key] = (models: models, fetchedAt: Date())
-            // Warmup fetched models; no log.
             return models
         } catch {
-            // Warmup fetch failed; no log.
             return []
         }
     }

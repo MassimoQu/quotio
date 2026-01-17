@@ -157,6 +157,22 @@ export function authRoutes(deps: AuthRoutesDeps): Hono {
 		return c.json({ models });
 	});
 
+	app.get('/auth/:id/token', async (c) => {
+		const id = c.req.param('id');
+		const authFile = await store.getAuthFile(id);
+		if (!authFile) {
+			return c.json({ error: 'Auth file not found' }, 404);
+		}
+		if (!authFile.accessToken) {
+			return c.json({ error: 'No access token available' }, 400);
+		}
+		return c.json({
+			access_token: authFile.accessToken,
+			expires_at: authFile.expiresAt,
+			provider: authFile.provider,
+		});
+	});
+
 	app.post('/auth/refresh', async (c) => {
 		const body = (await c.req.json().catch(() => ({
 			provider: undefined,

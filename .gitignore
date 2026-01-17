@@ -109,6 +109,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Generic cache
 .cache/
 
+# Turborepo cache
+.turbo/
+
 # ========================================
 # DEPENDENCIES (if used)
 # ========================================

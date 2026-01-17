@@ -1,7 +1,11 @@
 import { type AIProvider, parseProvider } from '@quotio/core';
 import type { ProviderQuotaData } from '@quotio/core';
 import { Hono } from 'hono';
+import { CopilotAvailableModelsFetcher } from '../../../services/quota-fetchers/copilot-models.js';
 import { getQuotaService } from '../../../services/quota/index.js';
+
+// Singleton instance for caching
+const copilotModelsFetcher = new CopilotAvailableModelsFetcher();
 
 interface QuotaResponseEntry {
 	provider: AIProvider;
@@ -133,6 +137,12 @@ export function quotaRoutes(): Hono {
 			quotas: entries,
 			errors,
 		});
+	});
+
+	app.get('/quota/copilot/models', async (c) => {
+		const models = await copilotModelsFetcher.fetchAllAvailableModels();
+		const modelIds = models.filter((m) => m.model_picker_enabled === true).map((m) => m.id);
+		return c.json({ model_ids: modelIds });
 	});
 
 	return app;

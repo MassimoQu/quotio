@@ -12,156 +12,226 @@ final class DaemonProxyConfigService {
     private(set) var isLoading = false
     private(set) var lastError: String?
     
-    private(set) var config: IPCProxyConfigData?
+    private(set) var config: ServerConfigResponse?
     
-    private let ipcClient = DaemonIPCClient.shared
-    private let daemonManager = DaemonManager.shared
+    private let apiClient = QuotioAPIClient.shared
     
     private init() {}
     
-    private var isDaemonReady: Bool {
-        get async {
-            if daemonManager.isRunning { return true }
-            return await daemonManager.checkHealth()
-        }
+    private func ensureConnected() async throws {
+        try await apiClient.connect()
     }
     
-    func fetchAllConfig() async -> IPCProxyConfigData? {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return nil
-        }
-        
+    func fetchAllConfig() async -> ServerConfigResponse? {
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.getProxyConfigAll()
-            if result.success, let configData = result.config {
-                config = configData
-                return configData
-            } else {
-                lastError = result.error ?? "Failed to fetch config"
-                return nil
-            }
+            try await ensureConnected()
+            let result = try await apiClient.getAllConfig()
+            config = result
+            return result
         } catch {
             lastError = error.localizedDescription
             return nil
         }
     }
     
-    func getConfig(key: String) async -> String? {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return nil
-        }
-        
+    func getDebug() async -> Bool? {
         do {
-            let result = try await ipcClient.getProxyConfig(key: key)
-            if result.success {
-                return result.value?.stringValue
-            } else {
-                lastError = result.error ?? "Failed to get config"
-                return nil
-            }
+            try await ensureConnected()
+            let result = try await apiClient.getDebugMode()
+            return result.enabled
         } catch {
             lastError = error.localizedDescription
             return nil
         }
     }
     
-    func setConfig(key: String, value: String) async throws {
-        guard await isDaemonReady else {
-            throw DaemonProxyConfigError.daemonNotRunning
-        }
-        
+    func setDebug(_ enabled: Bool) async throws {
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.setProxyConfig(key: key, value: value)
-            if !result.success {
-                throw DaemonProxyConfigError.updateFailed(result.error ?? "Unknown error")
-            }
-        } catch let error as DaemonProxyConfigError {
-            lastError = error.localizedDescription
-            throw error
+            try await ensureConnected()
+            _ = try await apiClient.setDebugMode(enabled)
         } catch {
             lastError = error.localizedDescription
             throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
         }
     }
     
-    func setPort(_ port: Int) async throws {
-        try await setConfig(key: "port", value: String(port))
-    }
-    
-    func setSecretKey(_ key: String) async throws {
-        try await setConfig(key: "secret-key", value: key)
-    }
-    
-    func setDebug(_ enabled: Bool) async throws {
-        try await setConfig(key: "debug", value: enabled ? "true" : "false")
-    }
-    
-    func setControlPanelDisabled(_ disabled: Bool) async throws {
-        try await setConfig(key: "disable-control-panel", value: disabled ? "true" : "false")
-    }
-    
-    // MARK: - Routing Strategy
-    
     func getRoutingStrategy() async -> String? {
-        return await getConfig(key: "routing-strategy")
+        do {
+            try await ensureConnected()
+            let result = try await apiClient.getRoutingStrategy()
+            return result.strategy
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
     }
     
     func setRoutingStrategy(_ strategy: String) async throws {
-        try await setConfig(key: "routing-strategy", value: strategy)
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.setRoutingStrategy(strategy)
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
     }
     
-    // MARK: - Proxy URL
-    
     func getProxyURL() async -> String? {
-        return await getConfig(key: "proxy-url")
+        do {
+            try await ensureConnected()
+            let result = try await apiClient.getProxyUrl()
+            return result.url
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
     }
     
     func setProxyURL(_ url: String) async throws {
-        try await setConfig(key: "proxy-url", value: url)
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.setProxyUrl(url)
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
     }
     
     func deleteProxyURL() async throws {
-        try await setConfig(key: "proxy-url", value: "")
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.deleteProxyUrl()
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
     }
     
-    // MARK: - Quota Exceeded Behavior
-    
-    func setQuotaExceededSwitchProject(_ enabled: Bool) async throws {
-        try await setConfig(key: "quota-exceeded-switch-project", value: enabled ? "true" : "false")
+    func getRequestRetry() async -> Int? {
+        do {
+            try await ensureConnected()
+            let result: APIRequestRetryResponse = try await apiClient.getRequestRetry()
+            return result.requestRetry
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
     }
-    
-    func setQuotaExceededSwitchPreviewModel(_ enabled: Bool) async throws {
-        try await setConfig(key: "quota-exceeded-switch-preview-model", value: enabled ? "true" : "false")
-    }
-    
-    // MARK: - Retry Configuration
     
     func setRequestRetry(_ count: Int) async throws {
-        try await setConfig(key: "request-retry", value: String(count))
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.setRequestRetry(count)
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
+    }
+    
+    func getMaxRetryInterval() async -> Int? {
+        do {
+            try await ensureConnected()
+            let result: APIMaxRetryIntervalResponse = try await apiClient.getMaxRetryInterval()
+            return result.maxRetryInterval
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
     }
     
     func setMaxRetryInterval(_ seconds: Int) async throws {
-        try await setConfig(key: "max-retry-interval", value: String(seconds))
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.setMaxRetryInterval(seconds)
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
     }
     
-    // MARK: - Logging
+    func getLoggingToFile() async -> Bool? {
+        do {
+            try await ensureConnected()
+            let result: APILoggingToFileResponse = try await apiClient.getLoggingToFile()
+            return result.loggingToFile
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
     
     func setLoggingToFile(_ enabled: Bool) async throws {
-        try await setConfig(key: "logging-to-file", value: enabled ? "true" : "false")
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.setLoggingToFile(enabled)
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
+    }
+    
+    func setQuotaExceededSwitchProject(_ enabled: Bool) async throws {
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.setQuotaExceededSwitchProject(enabled)
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
+    }
+    
+    func setQuotaExceededSwitchPreviewModel(_ enabled: Bool) async throws {
+        isLoading = true
+        lastError = nil
+        defer { isLoading = false }
+        
+        do {
+            try await ensureConnected()
+            _ = try await apiClient.setQuotaExceededSwitchPreviewModel(enabled)
+        } catch {
+            lastError = error.localizedDescription
+            throw DaemonProxyConfigError.updateFailed(error.localizedDescription)
+        }
     }
     
     func setRequestLog(_ enabled: Bool) async throws {
-        try await setConfig(key: "request-log", value: enabled ? "true" : "false")
+        // TODO: Server doesn't have request-log endpoint yet - stub for compatibility
     }
     
     func reset() {

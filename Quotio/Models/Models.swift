@@ -424,6 +424,29 @@ nonisolated struct RemoteManagementConfig: Codable {
     }
 }
 
+nonisolated struct IPCAuthAccount: Sendable {
+    let id: String
+    let name: String
+    let provider: String
+    let email: String?
+    let status: String
+    let disabled: Bool
+}
+
+nonisolated struct IPCLogEntry: Sendable {
+    let id: Int
+    let timestamp: String
+    let method: String
+    let path: String
+    let statusCode: Int
+    let duration: Int
+    let provider: String?
+    let model: String?
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let error: String?
+}
+
 // MARK: - Log Entry
 
 nonisolated struct LogEntry: Identifiable {

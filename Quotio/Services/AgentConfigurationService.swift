@@ -604,8 +604,8 @@ actor AgentConfigurationService {
         // Fetch available Copilot models to filter out unavailable ones
         let availableCopilotModelIds: [String]
         do {
-            let result = try await DaemonIPCClient.shared.fetchCopilotAvailableModels()
-            availableCopilotModelIds = result.modelIds
+            let result = try await QuotioAPIClient.shared.fetchCopilotAvailableModels()
+            availableCopilotModelIds = result.model_ids
         } catch {
             availableCopilotModelIds = []
         }

@@ -14,8 +14,7 @@ final class DaemonProxyService {
     private(set) var port: UInt16 = 8080
     private(set) var lastError: String?
     
-    private let daemonManager = DaemonManager.shared
-    private let ipcClient = DaemonIPCClient.shared
+    private let apiClient = QuotioAPIClient.shared
     private var healthCheckTask: Task<Void, Never>?
     
     private init() {
@@ -37,9 +36,9 @@ final class DaemonProxyService {
         defer { isStarting = false }
         
         do {
-            try await daemonManager.start()
+            try await apiClient.connect()
             
-            let result = try await ipcClient.startProxy(port: Int(port))
+            let result = try await apiClient.startProxy()
             
             if result.success {
                 isRunning = true
@@ -59,7 +58,7 @@ final class DaemonProxyService {
         healthCheckTask = nil
         
         do {
-            let result = try await ipcClient.stopProxy()
+            let result = try await apiClient.stopProxy()
             if result.success {
                 isRunning = false
             }
@@ -77,21 +76,14 @@ final class DaemonProxyService {
     }
     
     func checkHealth() async -> Bool {
-        do {
-            let result = try await ipcClient.proxyHealth()
-            return result.healthy
-        } catch {
-            return false
-        }
+        await apiClient.health()
     }
     
     func refreshStatus() async {
         do {
-            let status = try await ipcClient.proxyStatus()
+            let status = try await apiClient.proxyStatus()
             isRunning = status.running
-            if let statusPort = status.port {
-                port = UInt16(statusPort)
-            }
+            port = UInt16(status.port)
         } catch {
             isRunning = false
         }
@@ -125,11 +117,11 @@ enum DaemonProxyError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .startFailed:
-            return "Failed to start proxy via daemon"
+            return "Failed to start proxy"
         case .daemonNotRunning:
-            return "Daemon is not running"
+            return "Server is not running"
         case .connectionFailed:
-            return "Failed to connect to daemon"
+            return "Failed to connect to server"
         }
     }
 }

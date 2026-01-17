@@ -14,37 +14,24 @@ final class DaemonAPIKeysService {
     
     private(set) var apiKeys: [String] = []
     
-    private let ipcClient = DaemonIPCClient.shared
-    private let daemonManager = DaemonManager.shared
+    private let apiClient = QuotioAPIClient.shared
     
     private init() {}
     
-    private var isDaemonReady: Bool {
-        get async {
-            if daemonManager.isRunning { return true }
-            return await daemonManager.checkHealth()
-        }
+    private func ensureConnected() async throws {
+        try await apiClient.connect()
     }
     
     func fetchAPIKeys() async -> [String] {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return []
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.listApiKeys()
-            if result.success {
-                apiKeys = result.keys ?? []
-                return apiKeys
-            } else {
-                lastError = result.error ?? "Failed to fetch API keys"
-                return []
-            }
+            try await ensureConnected()
+            let result = try await apiClient.listApiKeys()
+            apiKeys = result.keys.map { $0.key }
+            return apiKeys
         } catch {
             lastError = error.localizedDescription
             return []
@@ -52,21 +39,18 @@ final class DaemonAPIKeysService {
     }
     
     func addAPIKey() async throws -> String? {
-        guard await isDaemonReady else {
-            throw DaemonAPIKeysError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.addApiKey()
-            if result.success, let key = result.key {
-                apiKeys.append(key)
-                return key
+            try await ensureConnected()
+            let result = try await apiClient.addApiKey()
+            if result.success {
+                apiKeys.append(result.key)
+                return result.key
             } else {
-                throw DaemonAPIKeysError.addFailed(result.error ?? "Unknown error")
+                throw DaemonAPIKeysError.addFailed("Server returned success: false")
             }
         } catch let error as DaemonAPIKeysError {
             lastError = error.localizedDescription
@@ -78,20 +62,17 @@ final class DaemonAPIKeysService {
     }
     
     func deleteAPIKey(_ key: String) async throws {
-        guard await isDaemonReady else {
-            throw DaemonAPIKeysError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.deleteApiKey(key)
+            try await ensureConnected()
+            let result = try await apiClient.deleteApiKey(key: key)
             if result.success {
                 apiKeys.removeAll { $0 == key }
             } else {
-                throw DaemonAPIKeysError.deleteFailed(result.error ?? "Unknown error")
+                throw DaemonAPIKeysError.deleteFailed("Server returned success: false")
             }
         } catch let error as DaemonAPIKeysError {
             lastError = error.localizedDescription

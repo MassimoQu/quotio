@@ -12,7 +12,18 @@ actor WarmupService {
         "https://cloudcode-pa.googleapis.com"
     ]
     
-    func warmup(daemonClient: DaemonIPCClient, authIndex: String, model: String) async throws {
+    private let session: URLSession
+    
+    init() {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        self.session = URLSession(configuration: config)
+    }
+    
+    func warmup(authId: String, model: String) async throws {
+        let tokenResponse = try await QuotioAPIClient.shared.getAuthToken(id: authId)
+        let accessToken = tokenResponse.access_token
+        
         let upstreamModel = mapAntigravityModelAlias(model)
         let payload = AntigravityWarmupRequest(
             project: "warmup-" + String(UUID().uuidString.prefix(5)).lowercased(),
@@ -31,35 +42,39 @@ actor WarmupService {
             )
         )
         
-        guard let body = try? String(data: JSONEncoder().encode(payload), encoding: .utf8) else {
+        guard let bodyData = try? JSONEncoder().encode(payload) else {
             throw WarmupError.encodingFailed
         }
         
-        let header = [
-            "Authorization": "Bearer $TOKEN$",
-            "Content-Type": "application/json",
-            "User-Agent": "antigravity/1.104.0"
-        ]
-        
         var lastError: WarmupError?
         for baseURL in antigravityBaseURLs {
-            let result = try await daemonClient.apiCall(
-                authIndex: authIndex,
-                method: "POST",
-                url: baseURL + "/v1internal:generateContent",
-                header: header,
-                data: body
-            )
-            
-            if !result.success {
-                lastError = WarmupError.httpError(0, result.error)
+            guard let url = URL(string: baseURL + "/v1internal:generateContent") else {
+                lastError = WarmupError.invalidURL
                 continue
             }
             
-            if let statusCode = result.statusCode, 200...299 ~= statusCode {
-                return
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("antigravity/1.104.0", forHTTPHeaderField: "User-Agent")
+            request.httpBody = bodyData
+            
+            do {
+                let (_, response) = try await session.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    lastError = WarmupError.invalidResponse
+                    continue
+                }
+                
+                if 200...299 ~= httpResponse.statusCode {
+                    return
+                }
+                lastError = WarmupError.httpError(httpResponse.statusCode, nil)
+            } catch {
+                lastError = WarmupError.httpError(0, error.localizedDescription)
+                continue
             }
-            lastError = WarmupError.httpError(result.statusCode ?? 0, result.body)
         }
         
         if let lastError {
@@ -95,12 +110,12 @@ actor WarmupService {
         }
     }
     
-    func fetchModels(daemonClient: DaemonIPCClient, authFileName: String) async throws -> [WarmupModelInfo] {
-        let result = try await daemonClient.getAuthModels(name: authFileName)
+    func fetchModels(authId: String) async throws -> [WarmupModelInfo] {
+        let result = try await QuotioAPIClient.shared.getAuthModels(id: authId)
         return result.models.map { model in
             WarmupModelInfo(
                 id: model.id,
-                ownedBy: model.ownedBy,
+                ownedBy: model.owned_by,
                 provider: model.provider
             )
         }

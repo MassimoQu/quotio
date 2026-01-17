@@ -568,16 +568,15 @@ struct UnifiedProxySettingsSection: View {
         if usesDaemonIPC {
             // Local mode: Use DaemonProxyConfigService
             if let config = await proxyConfigService.fetchAllConfig() {
-                proxyURL = config.proxyURL ?? ""
-                routingStrategy = config.routingStrategy ?? "round-robin"
-                requestRetry = config.requestRetry ?? 3
-                maxRetryInterval = config.maxRetryInterval ?? 30
-                loggingToFile = config.loggingToFile ?? true
-                requestLog = false  // Not in IPCProxyConfigData yet
-                debugMode = config.debug ?? false
-                // quotaExceeded fields not in IPCProxyConfigData, use defaults
-                switchProject = true
-                switchPreviewModel = true
+                proxyURL = config.proxyUrl
+                routingStrategy = config.routing.strategy
+                requestRetry = config.requestRetry
+                maxRetryInterval = config.maxRetryInterval
+                loggingToFile = config.loggingToFile
+                requestLog = false  // Not in ServerConfigResponse yet
+                debugMode = config.debug
+                switchProject = config.quotaExceeded.switchProject
+                switchPreviewModel = config.quotaExceeded.switchPreviewModel
                 proxyURLValidation = ProxyURLValidator.validate(proxyURL)
                 isLoading = false
                 

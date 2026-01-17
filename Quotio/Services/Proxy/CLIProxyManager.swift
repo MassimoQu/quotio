@@ -1251,22 +1251,18 @@ extension CLIProxyManager {
     // MARK: - Upgrade Flow
     
     /// Check if an upgrade is available.
-    /// First tries to ask running proxy via daemon, then falls back to direct GitHub API fetch.
+    /// First tries to ask running proxy via HTTP API, then falls back to direct GitHub API fetch.
     func checkForUpgrade() async {
-        // Get latest version - try daemon first, fallback to direct GitHub fetch
         let latestTag: String
         
         if proxyStatus.running {
-            // Try to get version from daemon IPC first
-            let daemonClient = DaemonIPCClient.shared
             do {
-                let result = try await daemonClient.getProxyLatestVersion()
+                let result = try await QuotioAPIClient.shared.getLatestVersion()
                 guard let version = result.latestVersion else {
                     throw NSError(domain: "ProxyUpgrade", code: -1)
                 }
                 latestTag = version
             } catch {
-                // Fallback to direct GitHub fetch
                 do {
                     let release = try await fetchLatestRelease()
                     latestTag = release.tagName
@@ -1277,7 +1273,6 @@ extension CLIProxyManager {
                 }
             }
         } else {
-            // Proxy not running - fetch directly from GitHub
             do {
                 let release = try await fetchLatestRelease()
                 latestTag = release.tagName

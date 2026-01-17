@@ -12,51 +12,31 @@ final class DaemonLogsService {
     private(set) var isLoading = false
     private(set) var lastError: String?
     private(set) var logEntries: [IPCLogEntry] = []
-    private(set) var lastId: Int?
+    private(set) var lastRequestId: String?
     
-    private let ipcClient = DaemonIPCClient.shared
-    private let daemonManager = DaemonManager.shared
+    /// Last log entry ID for pagination - derived from lastRequestId hash
+    var lastId: Int? {
+        lastRequestId?.hashValue
+    }
+    
+    private let apiClient = QuotioAPIClient.shared
     
     private init() {}
     
-    private var isDaemonReady: Bool {
-        get async {
-            if daemonManager.isRunning { return true }
-            return await daemonManager.checkHealth()
-        }
-    }
-    
-    func fetchLogs(after: Int? = nil) async -> [IPCLogEntry] {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return []
-        }
-        
+    func fetchLogs(after: Int? = nil, limit: Int = 100) async -> [IPCLogEntry] {
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.fetchLogs(after: after)
+            try await apiClient.connect()
+            let result = try await apiClient.fetchLogs(after: after, limit: limit)
             
-            guard result.success else {
-                lastError = result.error ?? "Failed to fetch logs"
-                return []
-            }
+            let entries = result.logs.map { convertToIPCLogEntry($0) }
+            logEntries = entries
+            lastRequestId = result.logs.last?.requestId
             
-            if let logs = result.logs {
-                if after == nil {
-                    logEntries = logs
-                } else {
-                    logEntries.append(contentsOf: logs)
-                }
-            }
-            
-            if let fetchedLastId = result.lastId {
-                lastId = fetchedLastId
-            }
-            
-            return result.logs ?? []
+            return entries
         } catch {
             lastError = error.localizedDescription
             return []
@@ -64,19 +44,16 @@ final class DaemonLogsService {
     }
     
     func clearLogs() async throws {
-        guard await isDaemonReady else {
-            throw DaemonLogsError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.clearLogs()
+            try await apiClient.connect()
+            let result = try await apiClient.clearLogs()
             if result.success {
                 logEntries = []
-                lastId = nil
+                lastRequestId = nil
             } else {
                 throw DaemonLogsError.clearFailed
             }
@@ -87,13 +64,29 @@ final class DaemonLogsService {
     }
     
     func refreshLogs() async {
-        _ = await fetchLogs(after: lastId)
+        _ = await fetchLogs()
     }
     
     func reset() {
         logEntries = []
-        lastId = nil
+        lastRequestId = nil
         lastError = nil
+    }
+    
+    private func convertToIPCLogEntry(_ entry: APILogEntry) -> IPCLogEntry {
+        IPCLogEntry(
+            id: entry.requestId.hashValue,
+            timestamp: entry.timestamp,
+            method: entry.method,
+            path: entry.path,
+            statusCode: entry.status ?? 0,
+            duration: entry.durationMs ?? 0,
+            provider: entry.provider,
+            model: entry.model,
+            inputTokens: nil,
+            outputTokens: nil,
+            error: entry.error
+        )
     }
 }
 

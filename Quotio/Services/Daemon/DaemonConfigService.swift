@@ -16,26 +16,18 @@ final class DaemonConfigService {
     private(set) var debugMode: Bool?
     private(set) var proxyUrl: String?
     
-    private let ipcClient = DaemonIPCClient.shared
-    private let daemonManager = DaemonManager.shared
+    private let apiClient = QuotioAPIClient.shared
     
     private init() {}
     
-    private var isDaemonReady: Bool {
-        get async {
-            if daemonManager.isRunning { return true }
-            return await daemonManager.checkHealth()
-        }
+    private func ensureConnected() async throws {
+        try await apiClient.connect()
     }
     
     func getRoutingStrategy() async -> String? {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return nil
-        }
-        
         do {
-            let result = try await ipcClient.getRoutingStrategy()
+            try await ensureConnected()
+            let result = try await apiClient.getRoutingStrategy()
             routingStrategy = result.strategy
             return result.strategy
         } catch {
@@ -45,17 +37,14 @@ final class DaemonConfigService {
     }
     
     func setRoutingStrategy(_ strategy: String) async throws {
-        guard await isDaemonReady else {
-            throw DaemonConfigError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.setRoutingStrategy(strategy)
-            routingStrategy = result.strategy
+            try await ensureConnected()
+            _ = try await apiClient.setRoutingStrategy(strategy)
+            routingStrategy = strategy
         } catch {
             lastError = error.localizedDescription
             throw error
@@ -63,15 +52,11 @@ final class DaemonConfigService {
     }
     
     func getDebugMode() async -> Bool? {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return nil
-        }
-        
         do {
-            let result = try await ipcClient.getDebugMode()
-            debugMode = result.debug
-            return result.debug
+            try await ensureConnected()
+            let result = try await apiClient.getDebugMode()
+            debugMode = result.enabled
+            return result.enabled
         } catch {
             lastError = error.localizedDescription
             return nil
@@ -79,17 +64,14 @@ final class DaemonConfigService {
     }
     
     func setDebugMode(_ enabled: Bool) async throws {
-        guard await isDaemonReady else {
-            throw DaemonConfigError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.setDebugMode(enabled)
-            debugMode = result.debug
+            try await ensureConnected()
+            _ = try await apiClient.setDebugMode(enabled)
+            debugMode = enabled
         } catch {
             lastError = error.localizedDescription
             throw error
@@ -97,15 +79,11 @@ final class DaemonConfigService {
     }
     
     func getProxyUrl() async -> String? {
-        guard await isDaemonReady else {
-            lastError = "Daemon not running"
-            return nil
-        }
-        
         do {
-            let result = try await ipcClient.getProxyUrl()
-            proxyUrl = result.proxyUrl
-            return result.proxyUrl
+            try await ensureConnected()
+            let result = try await apiClient.getProxyUrl()
+            proxyUrl = result.url
+            return result.url
         } catch {
             lastError = error.localizedDescription
             return nil
@@ -113,17 +91,19 @@ final class DaemonConfigService {
     }
     
     func setProxyUrl(_ url: String?) async throws {
-        guard await isDaemonReady else {
-            throw DaemonConfigError.daemonNotRunning
-        }
-        
         isLoading = true
         lastError = nil
         defer { isLoading = false }
         
         do {
-            let result = try await ipcClient.setProxyUrl(url)
-            proxyUrl = result.proxyUrl
+            try await ensureConnected()
+            if let url = url, !url.isEmpty {
+                _ = try await apiClient.setProxyUrl(url)
+                proxyUrl = url
+            } else {
+                _ = try await apiClient.deleteProxyUrl()
+                proxyUrl = nil
+            }
         } catch {
             lastError = error.localizedDescription
             throw error
