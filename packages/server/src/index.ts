@@ -7,56 +7,30 @@
  * @packageDocumentation
  */
 
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { loadConfig } from "./config/index.ts";
+import { createApp } from "./api/index.ts";
 
-const app = new Hono();
+async function main() {
+	// Load configuration
+	const config = await loadConfig();
 
-// Middleware
-app.use("*", logger());
-app.use("*", cors());
+	// Create Hono app
+	const app = createApp({ config });
 
-// Health check
-app.get("/health", (c) => {
-	return c.json({
-		status: "ok",
-		version: "0.1.0",
-		timestamp: new Date().toISOString(),
+	// Start server
+	const server = Bun.serve({
+		port: config.port,
+		hostname: config.host || "0.0.0.0",
+		fetch: app.fetch,
 	});
+
+	console.log(`🚀 quotio-server v0.1.0`);
+	console.log(`   Listening on http://${server.hostname}:${server.port}`);
+	console.log(`   Passthrough: ${config.passthrough.enabled ? `enabled (CLIProxyAPI @ :${config.passthrough.cliProxyPort})` : "disabled"}`);
+	console.log(`   Debug: ${config.debug}`);
+}
+
+main().catch((err) => {
+	console.error("Failed to start server:", err);
+	process.exit(1);
 });
-
-// Version endpoint
-app.get("/version", (c) => {
-	return c.json({
-		version: "0.1.0",
-		runtime: "bun",
-		framework: "hono",
-	});
-});
-
-// Placeholder for OpenAI-compatible API
-app.all("/v1/*", (c) => {
-	return c.json(
-		{
-			error: {
-				message: "quotio-server is under development",
-				type: "not_implemented",
-				code: "not_implemented",
-			},
-		},
-		501,
-	);
-});
-
-// Start server
-const port = Number(Bun.env.PORT ?? 18317);
-const host = Bun.env.HOST ?? "127.0.0.1";
-
-console.log(`🚀 quotio-server starting on http://${host}:${port}`);
-
-export default {
-	port,
-	hostname: host,
-	fetch: app.fetch,
-};
