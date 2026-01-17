@@ -844,6 +844,47 @@ const handlers: Record<string, MethodHandler> = {
 		}
 	},
 
+	'auth.copilot.startDeviceCode': async () => {
+		const { startCopilotDeviceCode } = await import('../auth/copilot-auth-service.ts');
+		return startCopilotDeviceCode();
+	},
+
+	'auth.copilot.pollDeviceCode': async (params: unknown) => {
+		const { deviceCode } = params as { deviceCode: string };
+		const { pollCopilotDeviceCode, getGitHubUserInfo, saveCopilotAuthFile } = await import(
+			'../auth/copilot-auth-service.ts'
+		);
+
+		const pollResult = await pollCopilotDeviceCode(deviceCode);
+
+		if (pollResult.status === 'success' && pollResult.accessToken) {
+			try {
+				const userInfo = await getGitHubUserInfo(pollResult.accessToken);
+				await saveCopilotAuthFile(pollResult.accessToken, userInfo.login);
+				return {
+					status: 'success' as const,
+					accessToken: pollResult.accessToken,
+				};
+			} catch (err) {
+				return {
+					status: 'error' as const,
+					error: err instanceof Error ? err.message : String(err),
+				};
+			}
+		}
+
+		return {
+			status: pollResult.status,
+			error: pollResult.error,
+		};
+	},
+
+	'auth.copilot.cancel': async (params: unknown) => {
+		// Device code flow cancellation - just acknowledge since we don't track state server-side
+		// Swift app handles the UI state cancellation
+		return { success: true };
+	},
+
 	'proxyConfig.getAll': async () => {
 		const { ManagementAPIClient } = await import('../management-api.ts');
 		const proxyState = getProcessState();

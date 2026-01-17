@@ -10,7 +10,7 @@
 // ============================================================================
 
 /** JSON-RPC 2.0 version identifier */
-export const JSONRPC_VERSION = "2.0" as const;
+export const JSONRPC_VERSION = '2.0' as const;
 
 /** Valid JSON-RPC request ID types */
 export type RequestId = string | number;
@@ -55,9 +55,7 @@ export interface JsonRpcErrorResponse {
 }
 
 /** JSON-RPC 2.0 Response (success or error) */
-export type JsonRpcResponse<R = unknown> =
-	| JsonRpcSuccessResponse<R>
-	| JsonRpcErrorResponse;
+export type JsonRpcResponse<R = unknown> = JsonRpcSuccessResponse<R> | JsonRpcErrorResponse;
 
 // ============================================================================
 // Standard JSON-RPC 2.0 Error Codes
@@ -103,15 +101,15 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Daemon lifecycle
 	// -------------------------------------------------------------------------
-	"daemon.ping": {
+	'daemon.ping': {
 		params: Record<string, never>;
 		result: { pong: true; timestamp: number };
 	};
-	"daemon.status": {
+	'daemon.status': {
 		params: Record<string, never>;
 		result: DaemonStatus;
 	};
-	"daemon.shutdown": {
+	'daemon.shutdown': {
 		params: { graceful?: boolean };
 		result: { success: true };
 	};
@@ -119,11 +117,11 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Quota operations
 	// -------------------------------------------------------------------------
-	"quota.fetch": {
+	'quota.fetch': {
 		params: { provider?: string; forceRefresh?: boolean };
 		result: QuotaFetchResult;
 	};
-	"quota.list": {
+	'quota.list': {
 		params: Record<string, never>;
 		result: QuotaListResult;
 	};
@@ -131,31 +129,31 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Agent operations
 	// -------------------------------------------------------------------------
-	"agent.detect": {
+	'agent.detect': {
 		params: { forceRefresh?: boolean };
 		result: AgentDetectResult;
 	};
-	"agent.configure": {
-		params: { agent: string; mode: "auto" | "manual" };
+	'agent.configure': {
+		params: { agent: string; mode: 'auto' | 'manual' };
 		result: AgentConfigureResult;
 	};
 
 	// -------------------------------------------------------------------------
 	// Proxy operations
 	// -------------------------------------------------------------------------
-	"proxy.start": {
+	'proxy.start': {
 		params: { port?: number };
 		result: ProxyStartResult;
 	};
-	"proxy.stop": {
+	'proxy.stop': {
 		params: Record<string, never>;
 		result: { success: true };
 	};
-	"proxy.status": {
+	'proxy.status': {
 		params: Record<string, never>;
 		result: ProxyStatusResult;
 	};
-	"proxy.health": {
+	'proxy.health': {
 		params: Record<string, never>;
 		result: { healthy: boolean };
 	};
@@ -163,7 +161,7 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Auth operations
 	// -------------------------------------------------------------------------
-	"auth.list": {
+	'auth.list': {
 		params: { provider?: string };
 		result: AuthListResult;
 	};
@@ -171,19 +169,19 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Config operations
 	// -------------------------------------------------------------------------
-	"config.get": {
+	'config.get': {
 		params: { key: string };
 		result: { value: unknown };
 	};
-	"config.set": {
+	'config.set': {
 		params: { key: string; value: unknown };
 		result: { success: true };
 	};
-	"config.setLocalManagementKey": {
+	'config.setLocalManagementKey': {
 		params: { key: string };
 		result: { success: true };
 	};
-	"config.getLocalManagementKey": {
+	'config.getLocalManagementKey': {
 		params: Record<string, never>;
 		result: { hasKey: boolean };
 	};
@@ -191,48 +189,48 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Universal Provider operations
 	// -------------------------------------------------------------------------
-	"universal.list": {
+	'universal.list': {
 		params: Record<string, never>;
 		result: UniversalProviderListResult;
 	};
-	"universal.get": {
+	'universal.get': {
 		params: { id: string };
 		result: { provider: UniversalProviderInfo | null };
 	};
-	"universal.add": {
+	'universal.add': {
 		params: UniversalProviderAddParams;
 		result: { success: boolean; provider?: UniversalProviderInfo };
 	};
-	"universal.update": {
+	'universal.update': {
 		params: UniversalProviderUpdateParams;
 		result: { success: boolean; provider?: UniversalProviderInfo };
 	};
-	"universal.delete": {
+	'universal.delete': {
 		params: { id: string };
 		result: { success: boolean };
 	};
-	"universal.setActive": {
+	'universal.setActive': {
 		params: { agentId: string; providerId: string };
 		result: { success: true };
 	};
-	"universal.getActive": {
+	'universal.getActive': {
 		params: { agentId: string };
 		result: { provider: UniversalProviderInfo | null };
 	};
-	"universal.storeKey": {
+	'universal.storeKey': {
 		params: { providerId: string; apiKey: string };
 		result: { success: boolean; error?: string };
 	};
-	"universal.hasKey": {
+	'universal.hasKey': {
 		params: { providerId: string };
 		result: { hasKey: boolean };
 	};
 
-	"oauth.start": {
+	'oauth.start': {
 		params: { provider: string; projectId?: string };
 		result: OAuthStartResult;
 	};
-	"oauth.poll": {
+	'oauth.poll': {
 		params: { state: string };
 		result: OAuthPollResult;
 	};
@@ -240,23 +238,23 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Request tracking operations
 	// -------------------------------------------------------------------------
-	"stats.list": {
+	'stats.list': {
 		params: { provider?: string; minutes?: number };
 		result: StatsListResult;
 	};
-	"stats.get": {
+	'stats.get': {
 		params: Record<string, never>;
 		result: StatsGetResult;
 	};
-	"stats.add": {
+	'stats.add': {
 		params: StatsAddParams;
 		result: { success: true };
 	};
-	"stats.clear": {
+	'stats.clear': {
 		params: Record<string, never>;
 		result: { success: true };
 	};
-	"stats.status": {
+	'stats.status': {
 		params: Record<string, never>;
 		result: { isActive: boolean; entryCount: number };
 	};
@@ -264,19 +262,19 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Tunnel operations (Cloudflare Tunnel)
 	// -------------------------------------------------------------------------
-	"tunnel.start": {
+	'tunnel.start': {
 		params: { port: number };
 		result: TunnelStartResult;
 	};
-	"tunnel.stop": {
+	'tunnel.stop': {
 		params: Record<string, never>;
 		result: { success: true };
 	};
-	"tunnel.status": {
+	'tunnel.status': {
 		params: Record<string, never>;
 		result: TunnelStatusResult;
 	};
-	"tunnel.installation": {
+	'tunnel.installation': {
 		params: Record<string, never>;
 		result: TunnelInstallationResult;
 	};
@@ -284,123 +282,139 @@ export interface IPCMethods {
 	// -------------------------------------------------------------------------
 	// Fallback / Virtual Model operations
 	// -------------------------------------------------------------------------
-	"fallback.getConfig": {
+	'fallback.getConfig': {
 		params: Record<string, never>;
 		result: FallbackConfigResult;
 	};
-	"fallback.setEnabled": {
+	'fallback.setEnabled': {
 		params: { enabled: boolean };
 		result: { success: true };
 	};
-	"fallback.listModels": {
+	'fallback.listModels': {
 		params: Record<string, never>;
 		result: FallbackListModelsResult;
 	};
-	"fallback.getModel": {
+	'fallback.getModel': {
 		params: { id: string };
 		result: { model: VirtualModelInfo | null };
 	};
-	"fallback.addModel": {
+	'fallback.addModel': {
 		params: { name: string };
 		result: { success: boolean; model?: VirtualModelInfo };
 	};
-	"fallback.removeModel": {
+	'fallback.removeModel': {
 		params: { id: string };
 		result: { success: boolean };
 	};
-	"fallback.updateModel": {
+	'fallback.updateModel': {
 		params: VirtualModelUpdateParams;
 		result: { success: boolean };
 	};
-	"fallback.addEntry": {
+	'fallback.addEntry': {
 		params: { modelId: string; provider: string; modelName: string };
 		result: { success: boolean; entry?: FallbackEntryInfo };
 	};
-	"fallback.removeEntry": {
+	'fallback.removeEntry': {
 		params: { modelId: string; entryId: string };
 		result: { success: boolean };
 	};
-	"fallback.moveEntry": {
+	'fallback.moveEntry': {
 		params: { modelId: string; fromIndex: number; toIndex: number };
 		result: { success: boolean };
 	};
-	"fallback.getRouteStates": {
+	'fallback.getRouteStates': {
 		params: Record<string, never>;
 		result: FallbackRouteStatesResult;
 	};
-	"fallback.clearRouteStates": {
+	'fallback.clearRouteStates': {
 		params: Record<string, never>;
 		result: { success: true };
 	};
-	"fallback.export": {
+	'fallback.export': {
 		params: Record<string, never>;
 		result: { json: string };
 	};
-	"fallback.import": {
+	'fallback.import': {
 		params: { json: string };
 		result: { success: boolean };
 	};
 
-	"proxyConfig.getAll": {
+	'proxyConfig.getAll': {
 		params: Record<string, never>;
 		result: ProxyConfigGetAllResult;
 	};
-	"proxyConfig.get": {
+	'proxyConfig.get': {
 		params: { key: string };
 		result: ProxyConfigGetResult;
 	};
-	"proxyConfig.set": {
+	'proxyConfig.set': {
 		params: { key: string; value: unknown };
 		result: { success: boolean; error?: string };
 	};
 
-	"auth.delete": {
+	'auth.delete': {
 		params: { name: string };
 		result: { success: boolean; error?: string };
 	};
-	"auth.deleteAll": {
+	'auth.deleteAll': {
 		params: Record<string, never>;
 		result: { success: boolean; error?: string };
 	};
-	"auth.setDisabled": {
+	'auth.setDisabled': {
 		params: { name: string; disabled: boolean };
 		result: { success: boolean; error?: string };
 	};
-	"auth.models": {
+	'auth.models': {
 		params: { name: string };
 		result: AuthModelsResult;
 	};
 
-	"apiKeys.list": {
+	'apiKeys.list': {
 		params: Record<string, never>;
 		result: APIKeysListResult;
 	};
-	"apiKeys.add": {
+	'apiKeys.add': {
 		params: Record<string, never>;
 		result: { success: boolean; key?: string; error?: string };
 	};
-	"apiKeys.delete": {
+	'apiKeys.delete': {
 		params: { key: string };
 		result: { success: boolean; error?: string };
 	};
 
-	"proxy.healthCheck": {
+	'proxy.healthCheck': {
 		params: Record<string, never>;
 		result: { healthy: boolean; error?: string };
 	};
 
-	"logs.fetch": {
+	'logs.fetch': {
 		params: { after?: number };
 		result: LogsFetchResult;
 	};
-	"logs.clear": {
+	'logs.clear': {
 		params: Record<string, never>;
 		result: { success: boolean; error?: string };
 	};
 
-	"proxy.latestVersion": {
+	'proxy.latestVersion': {
 		params: Record<string, never>;
 		result: ProxyLatestVersionResult;
+	};
+
+	// -------------------------------------------------------------------------
+	// Copilot Device Code Auth
+	// -------------------------------------------------------------------------
+	'auth.copilot.startDeviceCode': {
+		params: Record<string, never>;
+		result: CopilotStartDeviceCodeResult;
+	};
+	'auth.copilot.pollDeviceCode': {
+		params: CopilotPollDeviceCodeParams;
+		result: CopilotPollDeviceCodeResult;
+	};
+	'auth.copilot.cancel': {
+		params: { deviceCode: string };
+		result: { success: true };
 	};
 }
 
@@ -408,10 +422,10 @@ export interface IPCMethods {
 export type MethodName = keyof IPCMethods;
 
 /** Extract params type for a method */
-export type MethodParams<M extends MethodName> = IPCMethods[M]["params"];
+export type MethodParams<M extends MethodName> = IPCMethods[M]['params'];
 
 /** Extract result type for a method */
-export type MethodResult<M extends MethodName> = IPCMethods[M]["result"];
+export type MethodResult<M extends MethodName> = IPCMethods[M]['result'];
 
 // ============================================================================
 // Result Types
@@ -514,7 +528,7 @@ export interface AuthAccount {
 	name: string;
 	provider: string;
 	email?: string;
-	status: "ready" | "cooling" | "error";
+	status: 'ready' | 'cooling' | 'error';
 	disabled: boolean;
 }
 
@@ -563,7 +577,7 @@ export interface OAuthStartResult {
 }
 
 export interface OAuthPollResult {
-	status: "pending" | "success" | "error";
+	status: 'pending' | 'success' | 'error';
 	error?: string;
 }
 
@@ -633,12 +647,7 @@ export interface StatsAddParams {
 	errorMessage?: string;
 }
 
-export type TunnelStatus =
-	| "idle"
-	| "starting"
-	| "active"
-	| "stopping"
-	| "error";
+export type TunnelStatus = 'idle' | 'starting' | 'active' | 'stopping' | 'error';
 
 export interface TunnelStartResult {
 	success: boolean;
@@ -748,6 +757,29 @@ export interface LogsFetchResult {
 }
 
 // ============================================================================
+// Copilot Device Code Auth Types
+// ============================================================================
+
+export interface CopilotStartDeviceCodeResult {
+	success: boolean;
+	userCode?: string;
+	verificationUri?: string;
+	deviceCode?: string;
+	expiresIn?: number;
+	error?: string;
+}
+
+export interface CopilotPollDeviceCodeParams {
+	deviceCode: string;
+}
+
+export interface CopilotPollDeviceCodeResult {
+	status: 'pending' | 'success' | 'error';
+	accessToken?: string;
+	error?: string;
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -770,10 +802,7 @@ export function createRequest<M extends MethodName>(
 /**
  * Create a JSON-RPC 2.0 success response
  */
-export function createSuccessResponse<R>(
-	id: RequestId,
-	result: R,
-): JsonRpcSuccessResponse<R> {
+export function createSuccessResponse<R>(id: RequestId, result: R): JsonRpcSuccessResponse<R> {
 	return {
 		jsonrpc: JSONRPC_VERSION,
 		id,
@@ -804,10 +833,8 @@ export function createErrorResponse(
 /**
  * Check if a response is an error response
  */
-export function isErrorResponse(
-	response: JsonRpcResponse,
-): response is JsonRpcErrorResponse {
-	return "error" in response;
+export function isErrorResponse(response: JsonRpcResponse): response is JsonRpcErrorResponse {
+	return 'error' in response;
 }
 
 /**
@@ -816,28 +843,22 @@ export function isErrorResponse(
 export function isSuccessResponse<R>(
 	response: JsonRpcResponse<R>,
 ): response is JsonRpcSuccessResponse<R> {
-	return "result" in response;
+	return 'result' in response;
 }
 
 /**
  * Parse a JSON string into a JsonRpcRequest, with validation
  */
-export function parseRequest(
-	data: string,
-): JsonRpcRequest | JsonRpcErrorResponse {
+export function parseRequest(data: string): JsonRpcRequest | JsonRpcErrorResponse {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(data);
 	} catch {
-		return createErrorResponse(null, ErrorCodes.PARSE_ERROR, "Parse error");
+		return createErrorResponse(null, ErrorCodes.PARSE_ERROR, 'Parse error');
 	}
 
-	if (typeof parsed !== "object" || parsed === null) {
-		return createErrorResponse(
-			null,
-			ErrorCodes.INVALID_REQUEST,
-			"Invalid Request",
-		);
+	if (typeof parsed !== 'object' || parsed === null) {
+		return createErrorResponse(null, ErrorCodes.INVALID_REQUEST, 'Invalid Request');
 	}
 
 	const obj = parsed as Record<string, unknown>;
@@ -846,26 +867,23 @@ export function parseRequest(
 		return createErrorResponse(
 			null,
 			ErrorCodes.INVALID_REQUEST,
-			"Invalid Request: missing or invalid jsonrpc version",
+			'Invalid Request: missing or invalid jsonrpc version',
 		);
 	}
 
-	if (typeof obj.method !== "string") {
+	if (typeof obj.method !== 'string') {
 		return createErrorResponse(
 			null,
 			ErrorCodes.INVALID_REQUEST,
-			"Invalid Request: method must be a string",
+			'Invalid Request: method must be a string',
 		);
 	}
 
-	if (
-		obj.id === undefined ||
-		(typeof obj.id !== "string" && typeof obj.id !== "number")
-	) {
+	if (obj.id === undefined || (typeof obj.id !== 'string' && typeof obj.id !== 'number')) {
 		return createErrorResponse(
 			null,
 			ErrorCodes.INVALID_REQUEST,
-			"Invalid Request: id must be a string or number",
+			'Invalid Request: id must be a string or number',
 		);
 	}
 
@@ -880,14 +898,12 @@ export function parseRequest(
 /**
  * Message delimiter for socket communication (newline-delimited JSON)
  */
-export const MESSAGE_DELIMITER = "\n";
+export const MESSAGE_DELIMITER = '\n';
 
 /**
  * Encode a message for socket transmission
  */
-export function encodeMessage(
-	message: JsonRpcRequest | JsonRpcResponse,
-): string {
+export function encodeMessage(message: JsonRpcRequest | JsonRpcResponse): string {
 	return JSON.stringify(message) + MESSAGE_DELIMITER;
 }
 
@@ -897,10 +913,10 @@ export function encodeMessage(
 export function createMessageParser(
 	onMessage: (message: string) => void,
 ): (chunk: Buffer | string) => void {
-	let buffer = "";
+	let buffer = '';
 
 	return (chunk: Buffer | string) => {
-		buffer += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
+		buffer += typeof chunk === 'string' ? chunk : chunk.toString('utf-8');
 
 		let delimiterIndex = buffer.indexOf(MESSAGE_DELIMITER);
 		while (delimiterIndex !== -1) {
