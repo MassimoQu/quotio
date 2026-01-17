@@ -4,28 +4,25 @@
  * Endpoints for server administration and monitoring.
  */
 import { Hono } from "hono";
-import type { Config } from "../../../config/index.ts";
-import { healthRoutes } from "./health.ts";
+import type { Config } from "../../../config/index.js";
+import type { AuthManager } from "../../../auth/index.js";
+import { healthRoutes } from "./health.js";
+import { oauthManagementRoutes } from "./oauth.js";
 
 interface ManagementRoutesDeps {
 	config: Config;
+	authManager: AuthManager;
 }
 
 export function managementRoutes(deps: ManagementRoutesDeps): Hono {
 	const app = new Hono();
+	const { config, authManager } = deps;
 
 	// Mount health routes at /
-	app.route("/", healthRoutes(deps));
+	app.route("/", healthRoutes({ config }));
 
-	// Placeholder for auth file management (Phase 3+)
-	app.get("/auth-files", (c) => {
-		return c.json({
-			error: {
-				message: "Auth file management not yet implemented",
-				type: "not_implemented",
-			},
-		}, 501);
-	});
+	// Mount OAuth management routes
+	app.route("/", oauthManagementRoutes({ authManager }));
 
 	// Placeholder for usage stats (Phase 6+)
 	app.get("/usage", (c) => {

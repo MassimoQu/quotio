@@ -4,26 +4,32 @@
  * Creates the main Hono application with all routes and middleware.
  */
 import { Hono } from "hono";
-import type { Config } from "../config/index.ts";
-import { loggingMiddleware } from "./middleware/logging.ts";
-import { corsMiddleware } from "./middleware/cors.ts";
-import { createPassthroughMiddleware } from "./middleware/passthrough.ts";
-import { v1Routes } from "./routes/v1/index.ts";
-import { managementRoutes } from "./routes/management/index.ts";
+import type { Config } from "../config/index.js";
+import type { AuthManager } from "../auth/index.js";
+import type { TokenStore } from "../store/index.js";
+import { loggingMiddleware } from "./middleware/logging.js";
+import { corsMiddleware } from "./middleware/cors.js";
+import { createPassthroughMiddleware } from "./middleware/passthrough.js";
+import { v1Routes } from "./routes/v1/index.js";
+import { managementRoutes } from "./routes/management/index.js";
+import { oauthRoutes } from "./routes/oauth/index.js";
 
 export interface AppDependencies {
 	config: Config;
+	authManager: AuthManager;
+	store: TokenStore;
 }
 
 export function createApp(deps: AppDependencies): Hono {
 	const app = new Hono();
+	const { config, authManager, store } = deps;
 
 	// Global middleware
 	app.use("*", loggingMiddleware);
 	app.use("*", corsMiddleware);
 
 	// Passthrough middleware (forwards unimplemented endpoints to CLIProxyAPI)
-	const passthrough = createPassthroughMiddleware(deps.config);
+	const passthrough = createPassthroughMiddleware(config);
 	app.use("*", passthrough);
 
 	// Root health check (simple)
@@ -44,11 +50,14 @@ export function createApp(deps: AppDependencies): Hono {
 		});
 	});
 
+	// OAuth callback routes (at root level for provider redirects)
+	app.route("/", oauthRoutes({ authManager }));
+
 	// OpenAI-compatible API (v1)
 	app.route("/v1", v1Routes());
 
 	// Management API
-	app.route("/v0/management", managementRoutes(deps));
+	app.route("/v0/management", managementRoutes({ config, authManager }));
 
 	// 404 handler
 	app.notFound((c) => {
