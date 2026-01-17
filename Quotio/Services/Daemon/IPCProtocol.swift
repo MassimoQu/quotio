@@ -84,6 +84,24 @@ nonisolated enum IPCMethod: String, Sendable {
     case authOAuth = "oauth.start"
     case authPoll = "oauth.poll"
     
+    // Copilot Device Code
+    case authCopilotStartDeviceCode = "auth.copilot.startDeviceCode"
+    case authCopilotPollDeviceCode = "auth.copilot.pollDeviceCode"
+    case authCopilotCancel = "auth.copilot.cancel"
+    
+    // Kiro Google OAuth
+    case authKiroGoogle = "auth.kiro.google"
+    case authKiroPollGoogle = "auth.kiro.pollGoogle"
+    case authKiroCancelGoogle = "auth.kiro.cancelGoogle"
+    
+    // Kiro AWS Builder ID
+    case authKiroAws = "auth.kiro.aws"
+    case authKiroPollAws = "auth.kiro.pollAws"
+    case authKiroCancelAws = "auth.kiro.cancelAws"
+    
+    // Kiro IDE Import
+    case authKiroImport = "auth.kiro.import"
+    
     // Logs
     case logsFetch = "logs.fetch"
     case logsClear = "logs.clear"
@@ -594,6 +612,67 @@ nonisolated struct IPCModelStats: Codable, Sendable {
     let totalInputTokens: Int
     let totalOutputTokens: Int
     let averageDurationMs: Double
+}
+
+// MARK: - Auth Result Types
+
+// Copilot Device Code
+nonisolated struct IPCCopilotStartDeviceCodeResult: Codable, Sendable {
+    let success: Bool
+    let userCode: String?
+    let verificationUri: String?
+    let deviceCode: String?
+    let expiresIn: Int?
+    let error: String?
+}
+
+nonisolated struct IPCCopilotPollDeviceCodeResult: Codable, Sendable {
+    let status: String
+    let accessToken: String?
+    let error: String?
+}
+
+// Kiro Google OAuth
+nonisolated struct IPCKiroGoogleAuthResult: Codable, Sendable {
+    let success: Bool
+    let url: String?
+    let state: String?
+    let error: String?
+}
+
+nonisolated struct IPCKiroGooglePollResult: Codable, Sendable {
+    let status: String
+    let email: String?
+    let error: String?
+}
+
+// Kiro AWS Builder ID
+nonisolated struct IPCKiroAwsAuthResult: Codable, Sendable {
+    let success: Bool
+    let userCode: String?
+    let verificationUri: String?
+    let deviceCode: String?
+    let expiresIn: Int?
+    let error: String?
+}
+
+nonisolated struct IPCKiroAwsPollResult: Codable, Sendable {
+    let status: String
+    let email: String?
+    let error: String?
+}
+
+// Kiro IDE Import
+nonisolated struct IPCKiroImportResult: Codable, Sendable {
+    let success: Bool
+    let imported: Int
+    let accounts: [IPCKiroImportAccount]?
+    let error: String?
+}
+
+nonisolated struct IPCKiroImportAccount: Codable, Sendable {
+    let email: String
+    let method: String
 }
 
 // MARK: - Dynamic Value Type
