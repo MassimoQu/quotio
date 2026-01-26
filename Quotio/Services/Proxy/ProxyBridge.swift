@@ -9,8 +9,16 @@
 //  Additionally handles Model Fallback: when a virtual model is detected,
 //  resolves it to real models and automatically retries on quota exhaustion.
 //
+//  Smart Routing Integration:
+//  When SmartRoutingManager is enabled, uses frequency-aware selection
+//  to prioritize PRO accounts (high refresh frequency) over FREE accounts.
+//
 //  Architecture:
 //    CLI Tools → ProxyBridge (user port) → CLIProxyAPI (internal port)
+//
+//  Smart Routing Flow:
+//    Request → Check if virtual model → SmartRoutingManager.selectNextEntry()
+//    → Use best entry based on strategy → Record success/failure → Update stats
 //
 
 import Foundation
@@ -59,8 +67,35 @@ struct FallbackContext: Sendable {
     )
 }
 
+// MARK: - Smart Routing Context
+
+/// Context for smart routing during request processing
+/// Tracks the smart entry being used and whether fallback is needed
+struct SmartRoutingContext: Sendable {
+    let virtualModelName: String?
+    let smartEntry: SmartRoutingEntry?
+    let originalBody: String
+    
+    /// Whether smart routing is active
+    nonisolated var isActive: Bool { smartEntry != nil }
+    
+    /// Current model being used
+    nonisolated var currentModelId: String? { smartEntry?.modelId }
+    
+    /// Current provider being used
+    nonisolated var currentProvider: AIProvider? { smartEntry?.provider }
+    
+    /// Empty context for non-smart-routing requests
+    nonisolated static let inactive = SmartRoutingContext(
+        virtualModelName: nil,
+        smartEntry: nil,
+        originalBody: ""
+    )
+}
+
 /// A lightweight TCP proxy that forwards requests to CLIProxyAPI while
 /// ensuring fresh connections by forcing "Connection: close" on all requests.
+/// Now with Smart Routing support for intelligent model selection.
 @MainActor
 @Observable
 final class ProxyBridge {
@@ -100,6 +135,9 @@ final class ProxyBridge {
     /// Callback for request metadata extraction (for RequestTracker)
     var onRequestCompleted: ((RequestMetadata) -> Void)?
     
+    /// Smart routing manager reference
+    private let smartRoutingManager = SmartRoutingManager.shared
+    
     // MARK: - Request Metadata
 
     /// Metadata extracted from proxied requests
@@ -115,6 +153,8 @@ final class ProxyBridge {
         let durationMs: Int
         let requestSize: Int
         let responseSize: Int
+        let routingStrategy: String?  // Strategy used (for smart routing)
+        let wasFallback: Bool  // Whether fallback was triggered
     }
     
     // MARK: - Initialization
@@ -396,45 +436,100 @@ final class ProxyBridge {
 
         let metadata = extractMetadata(method: method, path: path, body: body)
 
-        // Check for virtual model and create fallback context
+        // Process on main actor for smart routing
         Task { @MainActor [weak self] in
             guard let self = self else { return }
-
-            let fallbackContext = self.createFallbackContext(body: body)
-            let resolvedBody: String
-
-            if fallbackContext.hasFallback, let entry = fallbackContext.currentEntry {
-                // Replace model in body with resolved model
-                resolvedBody = self.replaceModelInBody(body, with: entry.modelId)
+            
+            // Try smart routing first (new feature)
+            let smartRoutingContext = self.createSmartRoutingContext(body: body)
+            
+            if smartRoutingContext.isActive, let entry = smartRoutingContext.smartEntry {
+                // Use smart routing
+                let resolvedBody = self.replaceModelInBody(body, with: entry.modelId)
+                
+                self.forwardRequest(
+                    method: method,
+                    path: path,
+                    version: httpVersion,
+                    headers: headers,
+                    body: resolvedBody,
+                    originalConnection: connection,
+                    connectionId: connectionId,
+                    startTime: startTime,
+                    requestSize: data.count,
+                    metadata: metadata,
+                    targetPort: self.targetPort,
+                    targetHost: self.targetHost,
+                    smartRoutingContext: smartRoutingContext
+                )
             } else {
-                resolvedBody = body
+                // Fall back to traditional fallback (legacy support)
+                let fallbackContext = self.createFallbackContext(body: body)
+                let resolvedBody: String
+
+                if fallbackContext.hasFallback, let entry = fallbackContext.currentEntry {
+                    // Replace model in body with resolved model
+                    resolvedBody = self.replaceModelInBody(body, with: entry.modelId)
+                } else {
+                    resolvedBody = body
+                }
+
+                self.forwardRequest(
+                    method: method,
+                    path: path,
+                    version: httpVersion,
+                    headers: headers,
+                    body: resolvedBody,
+                    originalConnection: connection,
+                    connectionId: connectionId,
+                    startTime: startTime,
+                    requestSize: data.count,
+                    metadata: metadata,
+                    targetPort: self.targetPort,
+                    targetHost: self.targetHost,
+                    fallbackContext: fallbackContext
+                )
             }
-
-            let targetPortValue = self.targetPort
-            let targetHostValue = self.targetHost
-
-            self.forwardRequest(
-                method: method,
-                path: path,
-                version: httpVersion,
-                headers: headers,
-                body: resolvedBody,
-                originalConnection: connection,
-                connectionId: connectionId,
-                startTime: startTime,
-                requestSize: data.count,
-                metadata: metadata,
-                targetPort: targetPortValue,
-                targetHost: targetHostValue,
-                fallbackContext: fallbackContext
-            )
         }
     }
 
-    // MARK: - Fallback Support
+    // MARK: - Smart Routing Context Creation
+
+    /// Create smart routing context if the request uses a virtual model with smart routing enabled
+    private nonisolated func createSmartRoutingContext(body: String) -> SmartRoutingContext {
+        // Only use smart routing if enabled
+        guard SmartRoutingManager.shared.configuration.isEnabled else {
+            return .inactive
+        }
+
+        // Extract model from body
+        guard let bodyData = body.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+              let model = json["model"] as? String else {
+            return .inactive
+        }
+
+        // Check if this model is managed by smart routing
+        guard SmartRoutingManager.shared.shouldHandleRequest(modelName: model) else {
+            return .inactive
+        }
+
+        // Select the best entry using smart routing
+        guard let entry = SmartRoutingManager.shared.selectNextEntry(for: model) else {
+            return .inactive
+        }
+
+        return SmartRoutingContext(
+            virtualModelName: model,
+            smartEntry: entry,
+            originalBody: body
+        )
+    }
+
+    // MARK: - Fallback Support (Legacy)
 
     /// Create fallback context if the request uses a virtual model
-    private func createFallbackContext(body: String) -> FallbackContext {
+    private nonisolated func createFallbackContext(body: String) -> FallbackContext {
         let settings = FallbackSettingsManager.shared
 
         // Check if fallback is enabled
@@ -550,7 +645,130 @@ final class ProxyBridge {
         return (provider, model, method, path)
     }
     
-    // MARK: - Request Forwarding
+    // MARK: - Request Forwarding (Smart Routing)
+
+    private nonisolated func forwardRequest(
+        method: String,
+        path: String,
+        version: String,
+        headers: [(String, String)],
+        body: String,
+        originalConnection: NWConnection,
+        connectionId: Int,
+        startTime: Date,
+        requestSize: Int,
+        metadata: (provider: String?, model: String?, method: String, path: String),
+        targetPort: UInt16,
+        targetHost: String,
+        smartRoutingContext: SmartRoutingContext
+    ) {
+        // Create connection to CLIProxyAPI
+        guard let port = NWEndpoint.Port(rawValue: targetPort) else {
+            sendError(to: originalConnection, statusCode: 500, message: "Invalid target port")
+            return
+        }
+
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(targetHost), port: port)
+
+        let tcpOptions = NWProtocolTCP.Options()
+        tcpOptions.enableKeepalive = true
+        tcpOptions.keepaliveIdle = 30
+        tcpOptions.keepaliveInterval = 5
+        tcpOptions.keepaliveCount = 3
+        let parameters = NWParameters(tls: nil, tcp: tcpOptions)
+
+        let targetConnection = NWConnection(to: endpoint, using: parameters)
+
+        let timeoutSeconds = self.connectionTimeoutSeconds
+
+        // Use class-based wrapper for thread-safe cancellation flag
+        final class TimeoutState: @unchecked Sendable {
+            var cancelled = false
+        }
+        let timeoutState = TimeoutState()
+
+        DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(Int(timeoutSeconds))) { [weak targetConnection] in
+            guard !timeoutState.cancelled else { return }
+            guard let conn = targetConnection, conn.state != .ready else { return }
+            conn.cancel()
+        }
+
+        // Capture for closure
+        let capturedSmartContext = smartRoutingContext
+        let capturedHeaders = headers
+        let capturedMethod = method
+        let capturedPath = path
+        let capturedVersion = version
+
+        targetConnection.stateUpdateHandler = { [weak self] state in
+            guard let self = self else { return }
+
+            switch state {
+            case .ready:
+                timeoutState.cancelled = true
+                // Build forwarded request with Connection: close
+                var forwardedRequest = "\(capturedMethod) \(capturedPath) \(capturedVersion)\r\n"
+
+                // Forward headers, excluding ones we'll override
+                let excludedHeaders: Set<String> = ["connection", "content-length", "host", "transfer-encoding"]
+                for (name, value) in capturedHeaders {
+                    if !excludedHeaders.contains(name.lowercased()) {
+                        forwardedRequest += "\(name): \(value)\r\n"
+                    }
+                }
+
+                // Add our headers
+                forwardedRequest += "Host: \(targetHost):\(targetPort)\r\n"
+                forwardedRequest += "Connection: close\r\n"  // KEY: Force fresh connections
+                forwardedRequest += "Content-Length: \(body.utf8.count)\r\n"
+                forwardedRequest += "\r\n"
+                forwardedRequest += body
+
+                guard let requestData = forwardedRequest.data(using: .utf8) else {
+                    self.sendError(to: originalConnection, statusCode: 500, message: "Failed to encode request")
+                    targetConnection.cancel()
+                    return
+                }
+
+                targetConnection.send(content: requestData, completion: .contentProcessed { error in
+                    if error != nil {
+                        targetConnection.cancel()
+                        originalConnection.cancel()
+                    } else {
+                        // Start receiving response
+                        self.receiveSmartResponse(
+                            from: targetConnection,
+                            to: originalConnection,
+                            connectionId: connectionId,
+                            startTime: startTime,
+                            requestSize: requestSize,
+                            metadata: metadata,
+                            responseData: Data(),
+                            smartRoutingContext: capturedSmartContext,
+                            headers: capturedHeaders,
+                            method: capturedMethod,
+                            path: capturedPath,
+                            version: capturedVersion,
+                            targetPort: targetPort,
+                            targetHost: targetHost
+                        )
+                    }
+                })
+
+            case .failed:
+                timeoutState.cancelled = true
+                self.sendError(to: originalConnection, statusCode: 502, message: "Bad Gateway - Cannot connect to proxy")
+                targetConnection.cancel()
+
+            default:
+                break
+            }
+        }
+
+        targetConnection.start(queue: .global(qos: .userInitiated))
+    }
+    
+    // MARK: - Request Forwarding (Legacy Fallback)
 
     private nonisolated func forwardRequest(
         method: String,
@@ -673,7 +891,149 @@ final class ProxyBridge {
         targetConnection.start(queue: .global(qos: .userInitiated))
     }
     
-    // MARK: - Response Streaming (Iterative)
+    // MARK: - Response Streaming - Smart Routing
+
+    private nonisolated func receiveSmartResponse(
+        from targetConnection: NWConnection,
+        to originalConnection: NWConnection,
+        connectionId: Int,
+        startTime: Date,
+        requestSize: Int,
+        metadata: (provider: String?, model: String?, method: String, path: String),
+        responseData: Data,
+        smartRoutingContext: SmartRoutingContext,
+        headers: [(String, String)],
+        method: String,
+        path: String,
+        version: String,
+        targetPort: UInt16,
+        targetHost: String
+    ) {
+        targetConnection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            guard let self = self else { return }
+
+            if error != nil {
+                targetConnection.cancel()
+                originalConnection.cancel()
+                return
+            }
+
+            // Use let to avoid captured var warning - Data is already accumulated via parameter
+            let accumulatedResponse: Data
+            if let data = data, !data.isEmpty {
+                var newAccumulated = responseData
+                newAccumulated.append(data)
+                accumulatedResponse = newAccumulated
+            } else {
+                accumulatedResponse = responseData
+            }
+
+            // Check for quota exceeded BEFORE forwarding to client (within first 4KB to catch streaming errors)
+            let quotaCheckThreshold = 4096
+            if accumulatedResponse.count <= quotaCheckThreshold && !accumulatedResponse.isEmpty && smartRoutingContext.isActive {
+                let shouldFallback = self.shouldTriggerFallback(responseData: accumulatedResponse)
+
+                if shouldFallback, let modelName = smartRoutingContext.virtualModelName, let entry = smartRoutingContext.smartEntry {
+                    // Record failure and enter cooldown
+                    Task { @MainActor in
+                        SmartRoutingManager.shared.recordFailure(for: modelName, entryId: entry.id)
+                    }
+
+                    // Try next entry in smart routing
+                    if let nextEntry = SmartRoutingManager.shared.selectNextEntry(for: modelName) {
+                        // Don't forward error to client, try next entry instead
+                        targetConnection.cancel()
+
+                        let nextContext = SmartRoutingContext(
+                            virtualModelName: modelName,
+                            smartEntry: nextEntry,
+                            originalBody: smartRoutingContext.originalBody
+                        )
+
+                        let nextBody = self.replaceModelInBody(smartRoutingContext.originalBody, with: nextEntry.modelId)
+
+                        self.forwardRequest(
+                            method: method,
+                            path: path,
+                            version: version,
+                            headers: headers,
+                            body: nextBody,
+                            originalConnection: originalConnection,
+                            connectionId: connectionId,
+                            startTime: startTime,
+                            requestSize: requestSize,
+                            metadata: metadata,
+                            targetPort: targetPort,
+                            targetHost: targetHost,
+                            smartRoutingContext: nextContext
+                        )
+                        return
+                    }
+                }
+            }
+
+            if let data = data, !data.isEmpty {
+                // Forward chunk to client
+                originalConnection.send(content: data, completion: .contentProcessed { sendError in
+                    if isComplete {
+                        // Request complete - record metadata
+                        self.recordSmartCompletion(
+                            connectionId: connectionId,
+                            startTime: startTime,
+                            requestSize: requestSize,
+                            responseSize: accumulatedResponse.count,
+                            responseData: accumulatedResponse,
+                            metadata: metadata,
+                            smartRoutingContext: smartRoutingContext
+                        )
+
+                        targetConnection.cancel()
+                        originalConnection.send(content: nil, isComplete: true, completion: .contentProcessed { _ in
+                            originalConnection.cancel()
+                        })
+                    } else {
+                        // Continue streaming - use async dispatch to break recursion stack
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            self.receiveSmartResponse(
+                                from: targetConnection,
+                                to: originalConnection,
+                                connectionId: connectionId,
+                                startTime: startTime,
+                                requestSize: requestSize,
+                                metadata: metadata,
+                                responseData: accumulatedResponse,
+                                smartRoutingContext: smartRoutingContext,
+                                headers: headers,
+                                method: method,
+                                path: path,
+                                version: version,
+                                targetPort: targetPort,
+                                targetHost: targetHost
+                            )
+                        }
+                    }
+                })
+            } else if isComplete {
+                // Record completion
+                self.recordSmartCompletion(
+                    connectionId: connectionId,
+                    startTime: startTime,
+                    requestSize: requestSize,
+                    responseSize: accumulatedResponse.count,
+                    responseData: accumulatedResponse,
+                    metadata: metadata,
+                    smartRoutingContext: smartRoutingContext
+                )
+
+                targetConnection.cancel()
+                originalConnection.send(content: nil, isComplete: true, completion: .contentProcessed { _ in
+                    originalConnection.cancel()
+                })
+            }
+        }
+    }
+    
+    // MARK: - Response Streaming (Legacy)
 
     private nonisolated func receiveResponse(
         from targetConnection: NWConnection,
@@ -818,7 +1178,72 @@ final class ProxyBridge {
         }
     }
     
-    // MARK: - Completion Recording
+    // MARK: - Completion Recording (Smart Routing)
+
+    private nonisolated func recordSmartCompletion(
+        connectionId: Int,
+        startTime: Date,
+        requestSize: Int,
+        responseSize: Int,
+        responseData: Data,
+        metadata: (provider: String?, model: String?, method: String, path: String),
+        smartRoutingContext: SmartRoutingContext
+    ) {
+        let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
+
+        // Extract status code from response
+        var statusCode: Int?
+        if let responseString = String(data: responseData.prefix(100), encoding: .utf8),
+           let statusLine = responseString.components(separatedBy: "\r\n").first {
+            // Parse "HTTP/1.1 200 OK"
+            let parts = statusLine.components(separatedBy: " ")
+            if parts.count >= 2, let code = Int(parts[1]) {
+                statusCode = code
+            }
+        }
+
+        // Capture variables for Sendable closure
+        let capturedStatusCode = statusCode
+        let capturedMetadata = metadata
+
+        // Extract resolved model/provider from smart routing context
+        let resolvedModel: String? = smartRoutingContext.currentModelId
+        let resolvedProvider: String? = smartRoutingContext.currentProvider?.rawValue
+
+        // Notify callback on main thread
+        Task { @MainActor [weak self] in
+            // Record success to smart routing manager
+            if let modelName = smartRoutingContext.virtualModelName,
+               let entry = smartRoutingContext.smartEntry {
+                let isSuccess = (capturedStatusCode ?? 0) >= 200 && (capturedStatusCode ?? 0) < 300
+                
+                if isSuccess {
+                    SmartRoutingManager.shared.recordSuccess(for: modelName, entryId: entry.id)
+                } else {
+                    SmartRoutingManager.shared.recordFailure(for: modelName, entryId: entry.id)
+                }
+            }
+
+            let requestMetadata = RequestMetadata(
+                timestamp: startTime,
+                method: capturedMetadata.method,
+                path: capturedMetadata.path,
+                provider: capturedMetadata.provider,
+                model: capturedMetadata.model,
+                resolvedModel: resolvedModel,
+                resolvedProvider: resolvedProvider,
+                statusCode: capturedStatusCode,
+                durationMs: durationMs,
+                requestSize: requestSize,
+                responseSize: responseSize,
+                routingStrategy: smartRoutingContext.smartEntry.map { _ in "smart_priority" },
+                wasFallback: false  // Smart routing handles this internally
+            )
+            self?.onRequestCompleted?(requestMetadata)
+        }
+    }
+    
+    // MARK: - Completion Recording (Legacy)
 
     private nonisolated func recordCompletion(
         connectionId: Int,
@@ -882,7 +1307,9 @@ final class ProxyBridge {
                 statusCode: capturedStatusCode,
                 durationMs: durationMs,
                 requestSize: requestSize,
-                responseSize: responseSize
+                responseSize: responseSize,
+                routingStrategy: nil,
+                wasFallback: fallbackContext.currentIndex > 0
             )
             self?.onRequestCompleted?(requestMetadata)
         }
