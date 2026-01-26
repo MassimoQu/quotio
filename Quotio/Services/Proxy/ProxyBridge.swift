@@ -13,12 +13,20 @@
 //  When SmartRoutingManager is enabled, uses frequency-aware selection
 //  to prioritize PRO accounts (high refresh frequency) over FREE accounts.
 //
+//  Usage Tracking Integration:
+//  All requests are tracked via RequestTracker for per-model analytics
+//  and visualization in the dashboard.
+//
 //  Architecture:
 //    CLI Tools → ProxyBridge (user port) → CLIProxyAPI (internal port)
 //
 //  Smart Routing Flow:
 //    Request → Check if virtual model → SmartRoutingManager.selectNextEntry()
 //    → Use best entry based on strategy → Record success/failure → Update stats
+//
+//  Tracking Flow:
+//    Request → RequestTracker.trackRequest() → ModelUsageTracker.recordRequest()
+//    → Available in Dashboard charts
 //
 
 import Foundation
@@ -138,6 +146,9 @@ final class ProxyBridge {
     /// Smart routing manager reference
     private let smartRoutingManager = SmartRoutingManager.shared
     
+    /// Request tracker for usage monitoring
+    private let requestTracker = RequestTracker.shared
+    
     // MARK: - Request Metadata
 
     /// Metadata extracted from proxied requests
@@ -155,6 +166,7 @@ final class ProxyBridge {
         let responseSize: Int
         let routingStrategy: String?  // Strategy used (for smart routing)
         let wasFallback: Bool  // Whether fallback was triggered
+        let tokens: TokenUsage?  // Token usage (if available)
     }
     
     // MARK: - Initialization
@@ -197,6 +209,9 @@ final class ProxyBridge {
 
         lastError = nil
 
+        // Start request tracking
+        requestTracker.start()
+
         do {
             let parameters = NWParameters.tcp
             parameters.allowLocalEndpointReuse = true
@@ -231,6 +246,9 @@ final class ProxyBridge {
 
     /// Stops the proxy bridge
     func stop() {
+        // Stop request tracking
+        requestTracker.stop()
+        
         stateQueue.sync {
             listener?.cancel()
             listener = nil
@@ -1210,6 +1228,9 @@ final class ProxyBridge {
         let resolvedModel: String? = smartRoutingContext.currentModelId
         let resolvedProvider: String? = smartRoutingContext.currentProvider?.rawValue
 
+        // Extract token usage if available
+        let tokens = extractTokenUsage(from: responseData)
+
         // Notify callback on main thread
         Task { @MainActor [weak self] in
             // Record success to smart routing manager
@@ -1237,8 +1258,25 @@ final class ProxyBridge {
                 requestSize: requestSize,
                 responseSize: responseSize,
                 routingStrategy: smartRoutingContext.smartEntry.map { _ in "smart_priority" },
-                wasFallback: false  // Smart routing handles this internally
+                wasFallback: false,  // Smart routing handles this internally
+                tokens: tokens
             )
+            
+            // Track in RequestTracker for usage visualization
+            self?.requestTracker.trackRequest(
+                method: capturedMetadata.method,
+                path: capturedMetadata.path,
+                provider: capturedMetadata.provider,
+                model: capturedMetadata.model,
+                resolvedModel: resolvedModel,
+                resolvedProvider: resolvedProvider,
+                statusCode: capturedStatusCode,
+                latencyMs: durationMs,
+                requestSize: requestSize,
+                responseSize: responseSize,
+                tokens: tokens
+            )
+            
             self?.onRequestCompleted?(requestMetadata)
         }
     }
@@ -1274,6 +1312,9 @@ final class ProxyBridge {
         // Extract resolved model/provider from fallback context
         let resolvedModel: String? = fallbackContext.currentEntry?.modelId
         let resolvedProvider: String? = fallbackContext.currentEntry?.provider.rawValue
+        
+        // Extract token usage if available
+        let tokens = extractTokenUsage(from: responseData)
 
         // Notify callback on main thread
         Task { @MainActor [weak self] in
@@ -1309,10 +1350,43 @@ final class ProxyBridge {
                 requestSize: requestSize,
                 responseSize: responseSize,
                 routingStrategy: nil,
-                wasFallback: fallbackContext.currentIndex > 0
+                wasFallback: fallbackContext.currentIndex > 0,
+                tokens: tokens
             )
+            
+            // Track in RequestTracker for usage visualization
+            self?.requestTracker.trackRequest(
+                method: capturedMetadata.method,
+                path: capturedMetadata.path,
+                provider: capturedMetadata.provider,
+                model: capturedMetadata.model,
+                resolvedModel: resolvedModel,
+                resolvedProvider: resolvedProvider,
+                statusCode: capturedStatusCode,
+                latencyMs: durationMs,
+                requestSize: requestSize,
+                responseSize: responseSize,
+                tokens: tokens
+            )
+            
             self?.onRequestCompleted?(requestMetadata)
         }
+    }
+    
+    // MARK: - Token Extraction
+    
+    /// Extract token usage from OpenAI-style response
+    private nonisolated func extractTokenUsage(from responseData: Data) -> TokenUsage? {
+        guard let responseString = String(data: responseData, encoding: .utf8),
+              let jsonData = responseString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let usage = json["usage"] as? [String: Any],
+              let promptTokens = usage["prompt_tokens"] as? Int,
+              let completionTokens = usage["completion_tokens"] as? Int else {
+            return nil
+        }
+        
+        return TokenUsage(input: promptTokens, output: completionTokens)
     }
     
     // MARK: - Error Response
