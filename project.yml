@@ -23,6 +23,11 @@ targets:
       - path: Quotio
         excludes:
           - "**/.DS_Store"
+          - "**/*.md"
+          - "**/*.mdx"
+      - path: scripts
+        excludes:
+          - "**/*.md"
     settings:
       base:
         INFOPLIST_FILE: Quotio/Info.plist
