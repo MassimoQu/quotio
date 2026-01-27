@@ -577,10 +577,10 @@ final class ModelUsageTracker {
     func overallStats() -> OverallUsageStats {
         let allData = modelUsageData.values
         
-        let totalRequests = allData.map(\\.totalRequests).reduce(0, +)
-        let totalTokens = allData.map(\\.totalTokens).reduce(0, +)
-        let totalFailures = allData.map(\\.totalFailures).reduce(0, +)
-        let totalLatency = allData.map(\\.totalLatencyMs).reduce(0, +)
+        let totalRequests = allData.map(\$0.totalRequests).reduce(0, +)
+        let totalTokens = allData.map(\$0.totalTokens).reduce(0, +)
+        let totalFailures = allData.map(\$0.totalFailures).reduce(0, +)
+        let totalLatency = allData.map(\$0.totalLatencyMs).reduce(0, +)
         
         return OverallUsageStats(
             totalRequests: totalRequests,
@@ -602,7 +602,7 @@ final class ModelUsageTracker {
         let previousPeriodEnd = Date().addingTimeInterval(-period.duration)
         
         let previousPoints = modelUsageData.values
-            .flatMap(\\.history)
+            .flatMap(\$0.history)
             .filter { $0.timestamp >= previousPeriodStart && $0.timestamp < previousPeriodEnd }
         
         let previousTotal = previousPoints.map($0.value).reduce(0, +)
@@ -640,8 +640,8 @@ final class ModelUsageTracker {
         modelUsageData = loaded
         
         // Rebuild tracked sets
-        trackedProviders = Set(modelUsageData.values.map(\\.provider))
-        trackedModels = Set(modelUsageData.values.map(\\.modelId))
+        trackedProviders = Set(modelUsageData.values.map(\$0.provider))
+        trackedModels = Set(modelUsageData.values.map(\$0.modelId))
     }
     
     /// Clear all usage data

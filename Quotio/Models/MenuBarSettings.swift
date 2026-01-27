@@ -555,12 +555,12 @@ final class MenuBarSettingsManager {
     
     /// Remove items that no longer exist in quota data
     func pruneInvalidItems(validItems: [MenuBarQuotaItem]) {
-        let validIds = Set(validItems.map(\.id))
+        let validIds = Set(validItems.map($0.id))
         selectedItems.removeAll { !validIds.contains($0.id) }
     }
     
     func autoSelectNewAccounts(availableItems: [MenuBarQuotaItem]) {
-        let existingIds = Set(selectedItems.map(\.id))
+        let existingIds = Set(selectedItems.map($0.id))
         let newItems = availableItems.filter { !existingIds.contains($0.id) }
         
         let remainingSlots = warningThreshold - selectedItems.count

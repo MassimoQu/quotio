@@ -104,7 +104,7 @@ struct VirtualModel: Codable, Identifiable, Hashable, Sendable {
 
     /// Add a new entry at the end of the chain
     mutating func addEntry(provider: AIProvider, modelId: String) {
-        let nextPriority = (fallbackEntries.map(\.priority).max() ?? 0) + 1
+        let nextPriority = (fallbackEntries.map($0.priority).max() ?? 0) + 1
         let entry = FallbackEntry(provider: provider, modelId: modelId, priority: nextPriority)
         fallbackEntries.append(entry)
     }
@@ -159,6 +159,6 @@ struct FallbackConfiguration: Codable, Sendable {
 
     /// Get all enabled virtual model names
     var enabledModelNames: [String] {
-        virtualModels.filter(\.isEnabled).map(\.name)
+        virtualModels.filter($0.isEnabled).map($0.name)
     }
 }

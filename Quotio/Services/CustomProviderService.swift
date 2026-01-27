@@ -107,12 +107,12 @@ final class CustomProviderService {
     
     /// Get all enabled providers
     var enabledProviders: [CustomProvider] {
-        providers.filter(\.isEnabled)
+        providers.filter($0.isEnabled)
     }
     
     /// Get providers grouped by type
     var providersByType: [CustomProviderType: [CustomProvider]] {
-        Dictionary(grouping: providers, by: \.type)
+        Dictionary(grouping: providers, by: $0.type)
     }
     
     // MARK: - Persistence

@@ -264,24 +264,24 @@ final class SmartRoutingManager {
         let model = getOrCreateVirtualModel(name: virtualModelName)
         guard !model.smartEntries.isEmpty else { return nil }
         
-        let totalUsage = model.smartEntries.map(\\.usageCount).reduce(0, +)
-        let avgSuccessRate = model.smartEntries.map(\\.successRate).reduce(0, +) / Double(model.smartEntries.count)
+        let totalUsage = model.smartEntries.map(\$0.usageCount).reduce(0, +)
+        let avgSuccessRate = model.smartEntries.map(\$0.successRate).reduce(0, +) / Double(model.smartEntries.count)
         let proCount = model.smartEntries.filter { $0.refreshFrequency == .pro }.count
         
         return ModelStats(
             totalRequests: totalUsage,
             averageSuccessRate: avgSuccessRate,
-            proAccountUsage: model.smartEntries.filter { $0.refreshFrequency == .pro }.map(\\.usageCount).reduce(0, +),
+            proAccountUsage: model.smartEntries.filter { $0.refreshFrequency == .pro }.map(\$0.usageCount).reduce(0, +),
             totalEntries: model.smartEntries.count,
             proEntries: proCount,
-            entriesByFrequency: Dictionary(grouping: model.smartEntries, by: \\.refreshFrequency).mapValues(\\.count)
+            entriesByFrequency: Dictionary(grouping: model.smartEntries, by: \$0.refreshFrequency).mapValues(\$0.count)
         )
     }
     
     /// Get routing efficiency report
     func efficiencyReport() -> RoutingEfficiencyReport {
         let totalModels = activeModels.count
-        let enabledModels = activeModels.values.filter(\\.isEnabled).count
+        let enabledModels = activeModels.values.filter(\$0.isEnabled).count
         
         return RoutingEfficiencyReport(
             totalVirtualModels: totalModels,

@@ -54,7 +54,7 @@ nonisolated struct GroupedModelQuota: Identifiable, Sendable {
     var id: String { group.id }
     
     var percentage: Double {
-        models.map(\.percentage).min() ?? 0
+        models.map($0.percentage).min() ?? 0
     }
     
     var formattedPercentage: String {

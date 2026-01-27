@@ -683,28 +683,28 @@ private struct MenuAccountCardView: View {
             $0.name.contains("gemini-3-pro") && !$0.name.contains("image")
         }
         if !gemini3ProModels.isEmpty {
-            let aggregatedPercent = settings.aggregateModelPercentages(gemini3ProModels.map(\.percentage))
+            let aggregatedPercent = settings.aggregateModelPercentages(gemini3ProModels.map($0.percentage))
             let minModel = gemini3ProModels.min(by: { $0.percentage < $1.percentage })
             groups.append(AntigravityDisplayGroup(name: "Gemini 3 Pro", percentage: aggregatedPercent, resetTime: minModel?.resetTime))
         }
 
         let gemini3FlashModels = data.models.filter { $0.name.contains("gemini-3-flash") }
         if !gemini3FlashModels.isEmpty {
-            let aggregatedPercent = settings.aggregateModelPercentages(gemini3FlashModels.map(\.percentage))
+            let aggregatedPercent = settings.aggregateModelPercentages(gemini3FlashModels.map($0.percentage))
             let minModel = gemini3FlashModels.min(by: { $0.percentage < $1.percentage })
             groups.append(AntigravityDisplayGroup(name: "Gemini 3 Flash", percentage: aggregatedPercent, resetTime: minModel?.resetTime))
         }
 
         let geminiImageModels = data.models.filter { $0.name.contains("image") }
         if !geminiImageModels.isEmpty {
-            let aggregatedPercent = settings.aggregateModelPercentages(geminiImageModels.map(\.percentage))
+            let aggregatedPercent = settings.aggregateModelPercentages(geminiImageModels.map($0.percentage))
             let minModel = geminiImageModels.min(by: { $0.percentage < $1.percentage })
             groups.append(AntigravityDisplayGroup(name: "Gemini 3 Image", percentage: aggregatedPercent, resetTime: minModel?.resetTime))
         }
 
         let claudeModels = data.models.filter { $0.name.contains("claude") }
         if !claudeModels.isEmpty {
-            let aggregatedPercent = settings.aggregateModelPercentages(claudeModels.map(\.percentage))
+            let aggregatedPercent = settings.aggregateModelPercentages(claudeModels.map($0.percentage))
             let minModel = claudeModels.min(by: { $0.percentage < $1.percentage })
             groups.append(AntigravityDisplayGroup(name: "Claude 4.5", percentage: aggregatedPercent, resetTime: minModel?.resetTime))
         }

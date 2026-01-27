@@ -476,7 +476,7 @@ private struct AccountQuotaCardV2: View {
             $0.name.contains("gemini-3-pro") && !$0.name.contains("image") 
         }
         if !gemini3ProModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(gemini3ProModels.map(\.percentage))
+            let aggregatedQuota = settings.aggregateModelPercentages(gemini3ProModels.map(\$0.percentage))
             if aggregatedQuota >= 0 {
                 groups.append(AntigravityDisplayGroup(name: "Gemini 3 Pro", percentage: aggregatedQuota, models: gemini3ProModels))
             }
@@ -484,7 +484,7 @@ private struct AccountQuotaCardV2: View {
         
         let gemini3FlashModels = data.models.filter { $0.name.contains("gemini-3-flash") }
         if !gemini3FlashModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(gemini3FlashModels.map(\.percentage))
+            let aggregatedQuota = settings.aggregateModelPercentages(gemini3FlashModels.map(\$0.percentage))
             if aggregatedQuota >= 0 {
                 groups.append(AntigravityDisplayGroup(name: "Gemini 3 Flash", percentage: aggregatedQuota, models: gemini3FlashModels))
             }
@@ -492,7 +492,7 @@ private struct AccountQuotaCardV2: View {
         
         let geminiImageModels = data.models.filter { $0.name.contains("image") }
         if !geminiImageModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(geminiImageModels.map(\.percentage))
+            let aggregatedQuota = settings.aggregateModelPercentages(geminiImageModels.map(\$0.percentage))
             if aggregatedQuota >= 0 {
                 groups.append(AntigravityDisplayGroup(name: "Gemini 3 Image", percentage: aggregatedQuota, models: geminiImageModels))
             }
@@ -500,7 +500,7 @@ private struct AccountQuotaCardV2: View {
         
         let claudeModels = data.models.filter { $0.name.contains("claude") }
         if !claudeModels.isEmpty {
-            let aggregatedQuota = settings.aggregateModelPercentages(claudeModels.map(\.percentage))
+            let aggregatedQuota = settings.aggregateModelPercentages(claudeModels.map(\$0.percentage))
             if aggregatedQuota >= 0 {
                 groups.append(AntigravityDisplayGroup(name: "Claude", percentage: aggregatedQuota, models: claudeModels))
             }

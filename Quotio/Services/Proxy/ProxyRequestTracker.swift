@@ -157,7 +157,7 @@ final class ProxyRequestTracker {
         let duration = Date().timeIntervalSince(sessionStartTime)
         let requestsPerMinute = duration > 0 ? Double(sessionRequests) / (duration / 60) : 0
         
-        let successfulRequests = recentRequests.filter(\\.success).count
+        let successfulRequests = recentRequests.filter(\$0.success).count
         let failedRequests = recentRequests.filter { !$0.success }.count
         
         return SessionStats(
@@ -172,14 +172,14 @@ final class ProxyRequestTracker {
     
     /// Get provider breakdown
     func providerBreakdown() -> [String: Int] {
-        Dictionary(grouping: recentRequests, by: \\.provider)
-            .mapValues(\\.count)
+        Dictionary(grouping: recentRequests, by: \$0.provider)
+            .mapValues(\$0.count)
     }
     
     /// Get model breakdown
     func modelBreakdown() -> [String: Int] {
-        Dictionary(grouping: recentRequests, by: \\.model)
-            .mapValues(\\.count)
+        Dictionary(grouping: recentRequests, by: \$0.model)
+            .mapValues(\$0.count)
             .sorted { $0.value > $1.value }
     }
     
