@@ -307,7 +307,7 @@ struct ChartSummary: Sendable {
             return
         }
         
-        let values = points.map(\\.value)
+        let values = points.map($0.value)
         self.total = values.reduce(0, +)
         self.average = total / Double(values.count)
         self.max = values.max() ?? 0
@@ -605,7 +605,7 @@ final class ModelUsageTracker {
             .flatMap(\\.history)
             .filter { $0.timestamp >= previousPeriodStart && $0.timestamp < previousPeriodEnd }
         
-        let previousTotal = previousPoints.map(\\.value).reduce(0, +)
+        let previousTotal = previousPoints.map($0.value).reduce(0, +)
         
         let changePercent: Double
         if previousTotal > 0 {
