@@ -101,10 +101,9 @@ jobs:
           VERSION=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "0.0.0")
           DMG_NAME="Quotio-v${VERSION}"
           
-          # Create DMG
+          # Create DMG without custom icon (no .icns file in project)
           create-dmg \
             --volname "$DMG_NAME" \
-            --volicon "Quotio/Assets.xcassets/AppIcon.appiconset/AppIcon.icns" \
             --window-pos 200 200 \
             --window-size 800 600 \
             --app-drop-link 600 185 \
