@@ -55,8 +55,22 @@ jobs:
 
       - name: Build Quotio
         run: |
-          # Xcode project is in root directory, not in Quotio/ subdirectory
-          xcodebuild -project Quotio.xcodeproj \
+          echo "=== Working directory ==="
+          pwd
+          echo ""
+          echo "=== Current directory files ==="
+          ls -la
+          echo ""
+          echo "=== Xcode project files ==="
+          ls -la Quotio.xcodeproj/ 2>&1 || echo "Xcode project not found!"
+          echo ""
+          echo "=== project.pbxproj header ==="
+          head -10 Quotio.xcodeproj/project.pbxproj 2>&1 || true
+          echo ""
+          echo "=== Building with full path ==="
+          FULL_PATH=$(pwd)/Quotio.xcodeproj
+          echo "Project path: $FULL_PATH"
+          xcodebuild -project "$FULL_PATH" \
             -scheme Quotio \
             -configuration Release \
             -destination "platform=macOS" \
