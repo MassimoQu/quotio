@@ -1,0 +1,189 @@
+name: Auto Sync & Build
+
+on:
+  # 自动触发：每6小时检查一次上游更新
+  schedule:
+    - cron: '0 */6 * * *'
+  
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even without upstream changes'
+        required: false
+        default: 'false'
+
+jobs:
+  check-upstream:
+    name: Check for upstream updates
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      upstream_version: ${{ steps.check.outputs.upstream_version }}
+    
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check upstream for updates
+        id: check
+        run: |
+          # 添加上游仓库
+          git remote add upstream https://github.com/nguyenphutrong/quotio.git
+          git fetch upstream
+          
+          # 获取上游最新版本标签
+          UPSTREAM_VERSION=$(git describe --tags --abbrev=0 upstream/master 2>/dev/null || echo "unknown")
+          echo "upstream_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
+          
+          # 检查当前版本
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "unknown")
+          echo "current_version=$CURRENT_VERSION"
+          echo "Upstream: $UPSTREAM_VERSION, Current: $CURRENT_VERSION"
+          
+          # 比较版本
+          if [ "$CURRENT_VERSION" != "$UPSTREAM_VERSION" ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "🆕 Upstream has new version: $UPSTREAM_VERSION (current: $CURRENT_VERSION)"
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "✅ Already at latest version: $UPSTREAM_VERSION"
+          fi
+
+  sync-and-build:
+    name: Sync upstream & Build
+    needs: check-upstream
+    if: needs.check-upstream.outputs.has_updates == 'true' || github.event.inputs.force_rebuild == 'true'
+    runs-on: macos-14
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Sync upstream changes
+        run: |
+          git remote add upstream https://github.com/nguyenphutrong/quotio.git
+          git fetch upstream
+          
+          echo "=== Merging upstream changes ==="
+          MERGE_RESULT=$(git merge upstream/master --no-edit 2>&1 || echo "conflict")
+          
+          if echo "$MERGE_RESULT" | grep -q "conflict"; then
+            echo "⚠️ Merge conflicts detected!"
+            echo "Conflicts:"
+            git status --short | grep "^UU" || true
+            exit 1
+          else
+            echo "✅ Successfully merged upstream changes"
+          fi
+      
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "0.0.0")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+      
+      - name: Set up Homebrew
+        run: |
+          which brew || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      
+      - name: Generate Xcode project
+        working-directory: ./Quotio
+        run: xcodegen generate
+      
+      - name: Build Quotio
+        run: |
+          cd Quotio
+xcodebuild -project Quotio.xcodeproj \
+            -scheme Quotio \
+            -configuration Release \
+            -destination "platform=macOS" \
+            build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            2>&1 | tee build.log | grep -E "(Build|error:|warning:)" || true
+      
+      - name: Find built app
+        id: find-app
+        run: |
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "Quotio.app" -type d | head -1)
+          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+      
+      - name: Create release package
+        run: |
+          APP_PATH="${{ steps.find-app.outputs.app_path }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # 创建DMG
+          brew install create-dmg || true
+          create-dmg \
+            --volname "Quotio-v${VERSION}" \
+            --window-pos 200 200 \
+            --window-size 800 600 \
+            --app-drop-link 600 185 \
+            "Quotio-v${VERSION}.dmg" \
+            "$APP_PATH"
+          
+          # 压缩 app
+          zip -r "Quotio-v${VERSION}.app.zip" "$APP_PATH"
+          
+          ls -lh *.dmg *.app.zip
+      
+      - name: Create Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Quotio v${{ steps.version.outputs.version }}
+          body: |
+            ## 📦 Automated Build with Custom Features
+            
+            ### ✨ Features:
+            - Smart Model Selection (prioritizes PRO accounts)
+            - Usage Tracking with charts
+            - Time-series analytics
+            - Provider breakdown
+            
+            ### 📝 Installation:
+            1. Download below
+            2. Open and drag to Applications
+            3. Control-click to open (first time)
+          draft: false
+          prerelease: false
+      
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: Quotio/Quotio-v${{ steps.version.outputs.version }}.dmg
+          asset_name: Quotio-v${{ steps.version.outputs.version }}.dmg
+          asset_content_type: application/x-apple-diskimage
+      
+      - name: Upload ZIP
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: Quotio/Quotio-v${{ steps.version.outputs.version }}.app.zip
+          asset_name: Quotio-v${{ steps.version.outputs.version }}.app.zip
+          asset_content_type: application/zip
