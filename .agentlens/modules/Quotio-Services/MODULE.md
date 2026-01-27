@@ -2,14 +2,14 @@
 
 [← Back to INDEX](../../INDEX.md)
 
-**Type:** implicit | **Files:** 22
+**Type:** implicit | **Files:** 23
 
 ## Files
 
 | File | Lines | Large |
 | ---- | ----- | ----- |
-| `Quotio/Services/AgentConfigurationService.swift` | 696 | 📊 |
-| `Quotio/Services/AgentDetectionService.swift` | 251 |  |
+| `Quotio/Services/AgentConfigurationService.swift` | 1385 | 📊 |
+| `Quotio/Services/AgentDetectionService.swift` | 252 |  |
 | `Quotio/Services/CLIExecutor.swift` | 430 |  |
 | `Quotio/Services/ChecksumVerifier.swift` | 78 |  |
 | `Quotio/Services/CompatibilityChecker.swift` | 123 |  |
@@ -27,9 +27,10 @@
 | `Quotio/Services/RequestTracker.swift` | 187 |  |
 | `Quotio/Services/ShellProfileManager.swift` | 121 |  |
 | `Quotio/Services/StatusBarManager.swift` | 238 |  |
-| `Quotio/Services/StatusBarMenuBuilder.swift` | 1365 | 📊 |
+| `Quotio/Services/StatusBarMenuBuilder.swift` | 1397 | 📊 |
 | `Quotio/Services/UpdaterService.swift` | 168 |  |
 | `Quotio/Services/WarmupService.swift` | 183 |  |
+| `Quotio/Services/WarpService.swift` | 79 |  |
 
 ## Child Modules
 
