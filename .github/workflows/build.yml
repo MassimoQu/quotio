@@ -16,6 +16,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug - list files
+        run: |
+          echo "=== Working directory ==="
+          pwd
+          echo ""
+          echo "=== Root files ==="
+          ls -la
+          echo ""
+          echo "=== Xcode project ==="
+          ls -la Quotio.xcodeproj/ || echo "Xcode project not found!"
+          echo ""
+          echo "=== Quotio directory ==="
+          ls -la Quotio/ | head -20
+
       - name: Set up Homebrew
         run: |
           which brew || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
