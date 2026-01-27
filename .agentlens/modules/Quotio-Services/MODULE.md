@@ -35,6 +35,7 @@
 ## Child Modules
 
 - [Quotio-Services-Antigravity](../Quotio-Services-Antigravity/MODULE.md)
+- [Quotio-Services-Proxy](../Quotio-Services-Proxy/MODULE.md)
 - [Quotio-Services-QuotaFetchers](../Quotio-Services-QuotaFetchers/MODULE.md)
 
 ## Documentation
