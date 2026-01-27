@@ -2,7 +2,7 @@
 
 [← Back to INDEX](../../INDEX.md)
 
-**Type:** implicit | **Files:** 15
+**Type:** implicit | **Files:** 16
 
 ## Files
 
@@ -21,6 +21,7 @@
 | `Quotio/Models/OperatingMode.swift` | 370 |  |
 | `Quotio/Models/ProxyVersionModels.swift` | 201 |  |
 | `Quotio/Models/RequestLog.swift` | 379 |  |
+| `Quotio/Models/SmartRoutingModels.swift` | 527 | 📊 |
 | `Quotio/Models/TunnelModels.swift` | 78 |  |
 | `Quotio/Models/WarmupSettings.swift` | 337 |  |
 

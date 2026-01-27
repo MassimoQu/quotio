@@ -28,8 +28,8 @@ Follow this protocol to understand the codebase efficiently:
 
 ## Freshness Check
 
-**Generated:** 2026-01-27T19:29:11Z
-**Git HEAD:** `a343207`
+**Generated:** 2026-01-27T19:48:05Z
+**Git HEAD:** `710b38c`
 
 ### How to verify freshness
 
@@ -41,14 +41,14 @@ Follow this protocol to understand the codebase efficiently:
 
 | Module | Files | Type | Description |
 | ------ | ----- | ---- | ----------- |
-| `` | 11 | root | Module |
-| `Quotio/Models` | 15 | implicit | Data models |
-| `Quotio/Services` | 23 | implicit | Business logic services |
+| `` | 30 | root | Module |
+| `Quotio/Models` | 16 | implicit | Data models |
 | `Quotio/Services/Antigravity` | 5 | implicit | Module |
+| `Quotio/Services/Proxy` | 7 | implicit | Module |
 | `Quotio/Services/QuotaFetchers` | 9 | implicit | Module |
-| `Quotio/Views/Components` | 27 | implicit | UI components |
+| `Quotio/Views/Components` | 28 | implicit | UI components |
 | `Quotio/Views/Onboarding` | 6 | implicit | Module |
-| `Quotio/Views/Screens` | 8 | implicit | Module |
+| `Quotio/Views/Screens` | 9 | implicit | Module |
 
 ## When Docs Seem Stale
 
@@ -78,7 +78,7 @@ If documentation seems outdated or inconsistent with the code:
 
 | Metric | Value |
 | ------ | ----- |
-| Total files | 104 |
+| Total files | 110 |
 | Modules | 8 |
 | Warnings | 2 |
 

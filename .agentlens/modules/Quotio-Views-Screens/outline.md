@@ -2,7 +2,7 @@
 
 [← Back to MODULE](MODULE.md) | [← Back to INDEX](../../INDEX.md)
 
-Symbol maps for 5 large files in this module.
+Symbol maps for 6 large files in this module.
 
 ## Quotio/Views/Screens/DashboardScreen.swift (1014 lines)
 
@@ -158,4 +158,24 @@ Symbol maps for 5 large files in this module.
 | 2661 | struct | ManagementKeyRow | (internal) |
 | 2755 | struct | LaunchAtLoginToggle | (internal) |
 | 2813 | struct | UsageDisplaySettingsSection | (internal) |
+
+## Quotio/Views/Screens/UsageScreen.swift (768 lines)
+
+| Line | Kind | Name | Visibility |
+| ---- | ---- | ---- | ---------- |
+| 12 | struct | UsageScreen | (internal) |
+| 229 | struct | PeriodButton | (internal) |
+| 251 | struct | OverallStatsGrid | (internal) |
+| 308 | fn | formatNumber | (private) |
+| 318 | fn | formatCurrency | (private) |
+| 326 | struct | StatCard | (internal) |
+| 359 | struct | UsageTrendsCard | (internal) |
+| 452 | struct | ModelUsageCard | (internal) |
+| 595 | fn | formatLatency | (private) |
+| 607 | struct | ProgressBar | (internal) |
+| 630 | struct | ExpandedStatRow | (internal) |
+| 656 | struct | ExportUsageSheet | (internal) |
+| 725 | fn | performExport | (private) |
+| 739 | mod | extension UsageTimePeriod | (internal) |
+| 753 | mod | extension UsageMetricType | (internal) |
 

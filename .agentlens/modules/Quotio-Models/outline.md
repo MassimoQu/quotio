@@ -2,7 +2,7 @@
 
 [← Back to MODULE](MODULE.md) | [← Back to INDEX](../../INDEX.md)
 
-Symbol maps for 2 large files in this module.
+Symbol maps for 3 large files in this module.
 
 ## Quotio/Models/MenuBarSettings.swift (572 lines)
 
@@ -49,4 +49,31 @@ Symbol maps for 2 large files in this module.
 | 506 | mod | extension Int | (internal) |
 | 552 | fn | validate | (internal) |
 | 592 | fn | sanitize | (internal) |
+
+## Quotio/Models/SmartRoutingModels.swift (527 lines)
+
+| Line | Kind | Name | Visibility |
+| ---- | ---- | ---- | ---------- |
+| 26 | enum | RefreshFrequencyLevel | (internal) |
+| 87 | fn | detect | (internal) |
+| 138 | enum | RoutingStrategy | (internal) |
+| 178 | struct | SmartRoutingEntry | (internal) |
+| 218 | method | init | (internal) |
+| 284 | fn | recordSuccess | (internal) |
+| 294 | fn | recordFailure | (internal) |
+| 303 | fn | enterCooldown | (internal) |
+| 311 | fn | exitCooldown | (internal) |
+| 322 | struct | SmartVirtualModel | (internal) |
+| 354 | method | init | (internal) |
+| 369 | fn | selectNextEntry | (internal) |
+| 390 | fn | selectRoundRobin | (private) |
+| 396 | fn | selectFillFirst | (private) |
+| 402 | fn | selectSmartPriority | (private) |
+| 409 | fn | selectLoadBalanced | (private) |
+| 419 | fn | selectCacheFirst | (private) |
+| 454 | struct | SmartRoutingStats | (internal) |
+| 461 | method | init | (internal) |
+| 497 | struct | SmartRoutingConfiguration | (internal) |
+| 503 | method | init | (internal) |
+| 519 | fn | findVirtualModel | (internal) |
 

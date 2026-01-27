@@ -5,17 +5,31 @@
 ## Summary
 
 | High 🔴 | Medium 🟡 | Low 🟢 |
-| 0 | 0 | 9 |
+| 1 | 0 | 11 |
+
+## 🔴 High Priority
+
+### `WARNING` (Quotio/Services/LaunchAtLoginManager.swift:97)
+
+> if app is not in /Applications (registration may fail or be non-persistent)
 
 ## 🟢 Low Priority
 
-### `NOTE` (Quotio/Services/Proxy/CLIProxyManager.swift:207)
+### `NOTE` (Quotio/Services/AgentDetectionService.swift:16)
 
-> Bridge mode default is registered in AppDelegate.applicationDidFinishLaunching()
+> Only checks file existence (metadata), does NOT read file content
 
-### `NOTE` (Quotio/Services/Proxy/CLIProxyManager.swift:297)
+### `NOTE` (Quotio/Services/AgentDetectionService.swift:92)
 
-> Changes take effect after proxy restart (CLIProxyAPI does not support live routing API)
+> May not work in GUI apps due to limited PATH inheritance
+
+### `NOTE` (Quotio/Services/AgentDetectionService.swift:98)
+
+> Only checks file existence (metadata), does NOT read file content
+
+### `NOTE` (Quotio/Services/CLIExecutor.swift:33)
+
+> Only checks file existence (metadata), does NOT read file content
 
 ### `NOTE` (Quotio/ViewModels/AgentSetupViewModel.swift:495)
 

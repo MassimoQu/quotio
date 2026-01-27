@@ -2,7 +2,7 @@
 
 [← Back to INDEX](../../INDEX.md)
 
-**Type:** implicit | **Files:** 8
+**Type:** implicit | **Files:** 9
 
 ## Files
 
@@ -16,6 +16,7 @@
 | `Quotio/Views/Screens/ProvidersScreen.swift` | 973 | 📊 |
 | `Quotio/Views/Screens/QuotaScreen.swift` | 1599 | 📊 |
 | `Quotio/Views/Screens/SettingsScreen.swift` | 2876 | 📊 |
+| `Quotio/Views/Screens/UsageScreen.swift` | 768 | 📊 |
 
 ## Documentation
 
