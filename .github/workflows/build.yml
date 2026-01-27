@@ -35,6 +35,21 @@ jobs:
           which brew || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "brew installed"
 
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          # Normalize line endings for project.yml
+          sed -i '' 's/\r$//' project.yml 2>/dev/null || true
+          xcodegen generate
+
+      - name: Verify project generation
+        run: |
+          echo "=== After XcodeGen ==="
+          ls -la Quotio.xcodeproj/
+          head -5 Quotio.xcodeproj/project.pbxproj
+
       - name: Install create-dmg
         run: brew install create-dmg
 
