@@ -21,18 +21,12 @@ jobs:
           which brew || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "brew installed"
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Xcode project
-        working-directory: ./Quotio
-        run: |
-          ls -la
-          xcodegen generate || echo "Project may already exist"
+      - name: Install create-dmg
+        run: brew install create-dmg
 
       - name: Build Quotio
         run: |
-          cd Quotio
+          # Xcode project is in root directory, not in Quotio/ subdirectory
           xcodebuild -project Quotio.xcodeproj \
             -scheme Quotio \
             -configuration Release \
@@ -50,23 +44,11 @@ jobs:
           echo "Found: $APP_PATH"
           echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Quotio-app
-          path: ${{ steps.find-app.outputs.app_path }}
-          retention-days: 7
-
-      - name: Create DMG (optional)
-        if: runner.os == 'MacOS'
+      - name: Create DMG
         run: |
-          # Create a simple DMG for easy installation
           APP_PATH="${{ steps.find-app.outputs.app_path }}"
-          APP_NAME="Quotio"
-          DMG_NAME="Quotio-latest"
-          
-          # Install create-dmg if needed
-          brew install create-dmg || true
+          VERSION=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "0.0.0")
+          DMG_NAME="Quotio-v${VERSION}"
           
           # Create DMG
           create-dmg \
@@ -75,38 +57,55 @@ jobs:
             --window-pos 200 200 \
             --window-size 800 600 \
             --app-drop-link 600 185 \
-            "$DMG_NAME.dmg" \
-            "$APP_PATH" || echo "DMG creation skipped"
+            "${DMG_NAME}.dmg" \
+            "$APP_PATH"
+          
+          echo "Created: ${DMG_NAME}.dmg"
+          ls -lh *.dmg
 
       - name: Upload DMG
-        if: runner.os == 'MacOS'
         uses: actions/upload-artifact@v4
         with:
           name: Quotio-dmg
-          path: Quotio/*.dmg
+          path: Quotio-v*.dmg
+          retention-days: 7
+
+      - name: Upload app as ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quotio-app
+          path: ${{ steps.find-app.outputs.app_path }}
           retention-days: 7
 
   summary:
     needs: build
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Summary
         run: |
-          echo "## ✅ Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Your Quotio build is ready!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### New Features" >> $GITHUB_STEP_SUMMARY
-          echo "- ✨ Smart Model Selection (refresh frequency aware)" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 Usage Tracking with charts and analytics" >> $GITHUB_STEP_SUMMARY
-          echo "- 📈 Per-model usage visualization" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Download" >> $GITHUB_STEP_SUMMARY
-          echo "1. Go to **Actions** tab" >> $GITHUB_STEP_SUMMARY
-          echo "2. Select this workflow run" >> $GITHUB_STEP_SUMMARY
-          echo "3. Download **Quotio-app** artifact" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Installation" >> $GITHUB_STEP_SUMMARY
-          echo "1. Unzip the downloaded file" >> $GITHUB_STEP_SUMMARY
-          echo "2. Move Quotio.app to /Applications/" >> $GITHUB_STEP_SUMMARY
-          echo "3. Control-click and select 'Open' (first time only)" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            echo "## ✅ Build Complete" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Your Quotio build with new features is ready!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✨ New Features" >> $GITHUB_STEP_SUMMARY
+            echo "- **Smart Model Selection**: Prioritizes PRO accounts with high refresh frequency" >> $GITHUB_STEP_SUMMARY
+            echo "- **Usage Tracking**: Per-model analytics with beautiful charts" >> $GITHUB_STEP_SUMMARY
+            echo "- **Time-series Visualization**: Hour/Day/Week/Month trends" >> $GITHUB_STEP_SUMMARY
+            echo "- **Provider Breakdown**: Visual usage distribution" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📥 Download" >> $GITHUB_STEP_SUMMARY
+            echo "1. Go to **Actions** tab" >> $GITHUB_STEP_SUMMARY
+            echo "2. Select this workflow run" >> $GITHUB_STEP_SUMMARY
+            echo "3. Download **Quotio-dmg** or **Quotio-app** artifact" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📝 Installation" >> $GITHUB_STEP_SUMMARY
+            echo "- **DMG**: Open and drag Quotio.app to /Applications/" >> $GITHUB_STEP_SUMMARY
+            echo "- **ZIP**: Unzip and move Quotio.app to /Applications/" >> $GITHUB_STEP_SUMMARY
+            echo "- First time: Control-click → Open" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the build logs for errors." >> $GITHUB_STEP_SUMMARY
+          fi
