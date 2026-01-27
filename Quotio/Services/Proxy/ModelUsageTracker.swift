@@ -417,7 +417,7 @@ final class ModelUsageTracker {
             let stride = 2
             usageData.history = Array(usageData.history.enumerated()
                 .filter { $0.offset % stride == 0 || $0.offset == usageData.history.count - 1 }
-                .map(\\.element))
+                .map($0.element))
             usageData.history.append(historyPoint)
         } else {
             usageData.history.append(historyPoint)
