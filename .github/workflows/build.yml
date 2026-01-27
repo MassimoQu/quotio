@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14  # macOS Sonoma on Apple Silicon
+    runs-on: macos-15  # macOS Sequoia on Apple Silicon with latest Xcode
 
     steps:
       - name: Checkout repository
@@ -43,6 +43,13 @@ jobs:
           # Normalize line endings for project.yml
           sed -i '' 's/\r$//' project.yml 2>/dev/null || true
           xcodegen generate
+
+      - name: Check Xcode version
+        run: |
+          xcodebuild -version
+          echo ""
+          echo "=== Xcode project object version ==="
+          grep "objectVersion" Quotio.xcodeproj/project.pbxproj
 
       - name: Verify project generation
         run: |
