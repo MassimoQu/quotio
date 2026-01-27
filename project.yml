@@ -5,6 +5,11 @@ options:
     macOS: "13.0"
   xcodeVersion: "15.0"
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.8.0"
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -46,4 +51,4 @@ targets:
         Release:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
     dependencies:
-      - package: https://github.com/sparkle-project/Sparkle.git
+      - package: Sparkle
