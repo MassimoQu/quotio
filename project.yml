@@ -46,4 +46,4 @@ targets:
         Release:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
     dependencies:
-      - package: https://github.com/sparkle-project/Sparkle
+      - package: https://github.com/sparkle-project/Sparkle.git
