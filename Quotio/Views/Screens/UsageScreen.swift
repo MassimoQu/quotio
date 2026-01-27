@@ -12,7 +12,7 @@ import Charts
 struct UsageScreen: View {
     @Environment(QuotaViewModel.self) private var viewModel
     @StateObject private var usageTracker = ModelUsageTracker.shared
-    @StateObject private var requestTracker = RequestTracker.shared
+    @StateObject private var requestTracker = ProxyRequestTracker.shared
     
     @State private var selectedPeriod: UsageTimePeriod = .day
     @State private var selectedMetric: UsageMetricType = .requests

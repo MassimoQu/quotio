@@ -14,11 +14,11 @@ import Combine
 /// Tracks all API requests through the proxy for usage monitoring
 @MainActor
 @Observable
-final class RequestTracker {
+final class ProxyRequestTracker {
     
     // MARK: - Singleton
     
-    static let shared = RequestTracker()
+    static let shared = ProxyRequestTracker()
     
     // MARK: - Properties
     

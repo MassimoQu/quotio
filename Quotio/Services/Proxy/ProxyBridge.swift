@@ -147,7 +147,7 @@ final class ProxyBridge {
     private let smartRoutingManager = SmartRoutingManager.shared
     
     /// Request tracker for usage monitoring
-    private let requestTracker = RequestTracker.shared
+    private let requestTracker = ProxyRequestTracker.shared
     
     // MARK: - Request Metadata
 

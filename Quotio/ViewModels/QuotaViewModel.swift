@@ -33,7 +33,7 @@ final class QuotaViewModel {
     @ObservationIgnored private var lastProxyURL: String?
     
     /// Request tracker for monitoring API requests through ProxyBridge
-    let requestTracker = RequestTracker.shared
+    let requestTracker = ProxyRequestTracker.shared
     
     /// Tunnel manager for Cloudflare Tunnel integration
     let tunnelManager = TunnelManager.shared
