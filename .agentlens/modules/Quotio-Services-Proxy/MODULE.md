@@ -12,8 +12,8 @@
 | `Quotio/Services/Proxy/FallbackFormatConverter.swift` | 63 |  |
 | `Quotio/Services/Proxy/ModelUsageTracker.swift` | 746 | 📊 |
 | `Quotio/Services/Proxy/ProxyBridge.swift` | 1431 | 📊 |
+| `Quotio/Services/Proxy/ProxyRequestTracker.swift` | 271 |  |
 | `Quotio/Services/Proxy/ProxyStorageManager.swift` | 400 |  |
-| `Quotio/Services/Proxy/RequestTracker.swift` | 271 |  |
 | `Quotio/Services/Proxy/SmartRoutingManager.swift` | 410 |  |
 
 ## Documentation
