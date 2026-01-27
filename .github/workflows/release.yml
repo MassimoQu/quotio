@@ -18,8 +18,7 @@ env:
 jobs:
   build-and-release:
     runs-on: macos-15
-    permissions:
-      contents: write
+macos-latest      contents: write
 
     steps:
       # ===========================================
