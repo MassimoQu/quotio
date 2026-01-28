@@ -399,7 +399,7 @@ struct ProviderUsageBreakdownView: View {
                         x: .value("Provider", provider.provider),
                         y: .value("Requests", provider.totalRequests)
                     )
-                    .foregroundStyle(AIProvider(rawValue: provider.provider)?.color ?? .gray.gradient)
+                    .foregroundStyle(AIProvider(rawValue: provider.provider)?.color ?? .gray)
                     .cornerRadius(4)
                 }
                 .frame(height: CGFloat(sortedProviders.count * 40 + 50))

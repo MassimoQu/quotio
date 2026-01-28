@@ -693,7 +693,8 @@ final class ModelUsageTracker {
 // MARK: - Supporting Types
 
 /// Summary of usage for a provider
-struct ProviderUsageSummary: Sendable {
+struct ProviderUsageSummary: Sendable, Identifiable {
+    var id: String { provider }
     let provider: String
     let totalRequests: Int
     let totalTokens: Int
