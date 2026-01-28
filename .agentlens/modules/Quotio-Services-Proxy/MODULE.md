@@ -14,7 +14,7 @@
 | `Quotio/Services/Proxy/ProxyBridge.swift` | 1431 | 📊 |
 | `Quotio/Services/Proxy/ProxyRequestTracker.swift` | 285 |  |
 | `Quotio/Services/Proxy/ProxyStorageManager.swift` | 400 |  |
-| `Quotio/Services/Proxy/SmartRoutingManager.swift` | 410 |  |
+| `Quotio/Services/Proxy/SmartRoutingManager.swift` | 406 |  |
 
 ## Documentation
 

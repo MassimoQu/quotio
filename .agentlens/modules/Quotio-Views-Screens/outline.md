@@ -37,7 +37,7 @@ Symbol maps for 7 large files in this module.
 | 10 | struct | LogsScreen | (internal) |
 | 229 | fn | calculateStats | (private) |
 | 244 | fn | formatTokens | (private) |
-| 274 | struct | RequestStats | (internal) |
+| 274 | struct | LogsRequestStats | (internal) |
 | 282 | struct | StatItem | (internal) |
 | 305 | struct | RequestRow | (internal) |
 | 351 | struct | RequestDetailSheet | (internal) |
