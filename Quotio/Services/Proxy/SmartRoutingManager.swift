@@ -274,7 +274,7 @@ final class SmartRoutingManager {
             proAccountUsage: model.smartEntries.filter { $0.refreshFrequency == .pro }.map { $0.usageCount }.reduce(0, +),
             totalEntries: model.smartEntries.count,
             proEntries: proCount,
-            entriesByFrequency: Dictionary(grouping: model.smartEntries, by: $0.refreshFrequency).mapValues { $0.count }
+            entriesByFrequency: Dictionary(grouping: model.smartEntries) { $0.refreshFrequency }.mapValues { $0.count }
         )
     }
     

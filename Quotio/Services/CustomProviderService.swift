@@ -112,7 +112,7 @@ final class CustomProviderService {
     
     /// Get providers grouped by type
     var providersByType: [CustomProviderType: [CustomProvider]] {
-        Dictionary(grouping: providers, by: $0.type)
+        Dictionary(grouping: providers) { $0.type }
     }
     
     // MARK: - Persistence

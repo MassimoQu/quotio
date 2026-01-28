@@ -697,8 +697,8 @@ struct MultiModelComparisonChart: View {
                 chartData: ChartDataResult(
                     period: .day,
                     metric: .requests,
-                    points: samplePoints,
-                    summary: ChartSummary(points: samplePoints)
+                    points: Array(samplePoints),
+                    summary: ChartSummary(points: Array(samplePoints))
                 ),
                 title: "API Requests Over Time",
                 subtitle: "Last 24 hours"
