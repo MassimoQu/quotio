@@ -210,7 +210,7 @@ struct ModelUsageData: Codable, Identifiable, Sendable {
         self.provider = provider
         self.totalRequests = totalRequests
         self.totalInputTokens = totalInputTokens
-        self.totalOutputTokens = outputTokens
+        self.totalOutputTokens = totalOutputTokens
         self.totalFailures = totalFailures
         self.totalLatencyMs = totalLatencyMs
         self.firstUsed = firstUsed

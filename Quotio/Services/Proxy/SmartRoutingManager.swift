@@ -260,7 +260,7 @@ final class SmartRoutingManager {
     // MARK: - Statistics & Analytics
     
     /// Get statistics for a specific virtual model
-    func modelStats(for virtualModelName: String) -> ModelStats? {
+    func modelStats(for virtualModelName: String) -> RoutingModelStats? {
         let model = getOrCreateVirtualModel(name: virtualModelName)
         guard !model.smartEntries.isEmpty else { return nil }
         
@@ -268,7 +268,7 @@ final class SmartRoutingManager {
         let avgSuccessRate = model.smartEntries.map { $0.successRate }.reduce(0, +) / Double(model.smartEntries.count)
         let proCount = model.smartEntries.filter { $0.refreshFrequency == .pro }.count
         
-        return ModelStats(
+        return RoutingModelStats(
             totalRequests: totalUsage,
             averageSuccessRate: avgSuccessRate,
             proAccountUsage: model.smartEntries.filter { $0.refreshFrequency == .pro }.map { $0.usageCount }.reduce(0, +),
@@ -346,7 +346,7 @@ final class SmartRoutingManager {
 // MARK: - Supporting Types
 
 /// Statistics for a specific virtual model
-struct ModelStats {
+struct RoutingModelStats {
     let totalRequests: Int
     let averageSuccessRate: Double
     let proAccountUsage: Int
