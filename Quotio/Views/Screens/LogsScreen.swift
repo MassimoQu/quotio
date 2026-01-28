@@ -132,10 +132,8 @@ struct LogsScreen: View {
     // MARK: - Request History View
     
     private var requestHistoryView: some View {
-        let requests = filteredRequests
-        
         Group {
-            if requests.isEmpty {
+            if filteredRequests.isEmpty {
                 ContentUnavailableView {
                     Label("logs.noRequests".localized(), systemImage: "arrow.up.arrow.down")
                 } description: {
@@ -149,7 +147,7 @@ struct LogsScreen: View {
                     Divider()
                     
                     // Request List
-                    List(requests) { request in
+                    List(filteredRequests) { request in
                         RequestRow(request: request)
                             .contentShape(Rectangle())
                             .onTapGesture {
