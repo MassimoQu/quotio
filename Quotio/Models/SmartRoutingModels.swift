@@ -97,7 +97,7 @@ enum RefreshFrequencyLevel: String, Codable, CaseIterable, Sendable {
         // Check quota data for refresh hints
         if let quota = quotaData, !quota.models.isEmpty {
             // If quota is consistently high, likely PRO
-            let avgPercentage = quota.models.map(\$0.percentage).reduce(0, +) / Double(quota.models.count)
+            let avgPercentage = quota.models.map { $0.percentage }.reduce(0, +) / Double(quota.models.count)
             if avgPercentage > 80 {
                 return .pro
             }
@@ -522,6 +522,6 @@ struct SmartRoutingConfiguration: Codable, Sendable {
     
     /// Get all enabled virtual model names
     var enabledModelNames: [String] {
-        virtualModels.filter(\$0.isEnabled).map(\$0.name)
+        virtualModels.filter { $0.isEnabled }.map { $0.name }
     }
 }
