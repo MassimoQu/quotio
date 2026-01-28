@@ -2,7 +2,7 @@
 
 [← Back to MODULE](MODULE.md) | [← Back to INDEX](../../INDEX.md)
 
-Symbol maps for 5 large files in this module.
+Symbol maps for 7 large files in this module.
 
 ## Quotio/Views/Screens/DashboardScreen.swift (1014 lines)
 
@@ -29,6 +29,22 @@ Symbol maps for 5 large files in this module.
 | 314 | struct | VirtualModelsEmptyState | (internal) |
 | 356 | struct | VirtualModelRow | (internal) |
 | 474 | struct | FallbackEntryRow | (internal) |
+
+## Quotio/Views/Screens/LogsScreen.swift (521 lines)
+
+| Line | Kind | Name | Visibility |
+| ---- | ---- | ---- | ---------- |
+| 10 | struct | LogsScreen | (internal) |
+| 229 | fn | calculateStats | (private) |
+| 244 | fn | formatTokens | (private) |
+| 274 | struct | RequestStats | (internal) |
+| 282 | struct | StatItem | (internal) |
+| 305 | struct | RequestRow | (internal) |
+| 351 | struct | RequestDetailSheet | (internal) |
+| 420 | fn | formatBytes | (private) |
+| 432 | struct | DetailRow | (internal) |
+| 449 | struct | LogsListView | (internal) |
+| 471 | struct | LogRow | (internal) |
 
 ## Quotio/Views/Screens/ProvidersScreen.swift (973 lines)
 
@@ -158,4 +174,17 @@ Symbol maps for 5 large files in this module.
 | 2661 | struct | ManagementKeyRow | (internal) |
 | 2755 | struct | LaunchAtLoginToggle | (internal) |
 | 2813 | struct | UsageDisplaySettingsSection | (internal) |
+
+## Quotio/Views/Screens/UsageScreen.swift (527 lines)
+
+| Line | Kind | Name | Visibility |
+| ---- | ---- | ---- | ---------- |
+| 12 | struct | UsageScreen | (internal) |
+| 336 | fn | formatNumber | (private) |
+| 342 | fn | formatCompactNumber | (private) |
+| 356 | struct | StatCard | (internal) |
+| 388 | struct | ProviderRow | (internal) |
+| 424 | fn | formatNumber | (private) |
+| 432 | struct | ModelRow | (internal) |
+| 503 | struct | EmptyStateView | (internal) |
 

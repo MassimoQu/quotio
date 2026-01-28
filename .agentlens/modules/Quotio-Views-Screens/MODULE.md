@@ -12,11 +12,11 @@
 | `Quotio/Views/Screens/AgentSetupScreen.swift` | 200 |  |
 | `Quotio/Views/Screens/DashboardScreen.swift` | 1014 | 📊 |
 | `Quotio/Views/Screens/FallbackScreen.swift` | 528 | 📊 |
-| `Quotio/Views/Screens/LogsScreen.swift` | 445 |  |
+| `Quotio/Views/Screens/LogsScreen.swift` | 521 | 📊 |
 | `Quotio/Views/Screens/ProvidersScreen.swift` | 973 | 📊 |
 | `Quotio/Views/Screens/QuotaScreen.swift` | 1599 | 📊 |
 | `Quotio/Views/Screens/SettingsScreen.swift` | 2876 | 📊 |
-| `Quotio/Views/Screens/UsageScreen.swift` | 293 |  |
+| `Quotio/Views/Screens/UsageScreen.swift` | 527 | 📊 |
 
 ## Documentation
 
@@ -25,7 +25,13 @@
 ---
 
 | High 🔴 | Medium 🟡 | Low 🟢 |
-| 0 | 0 | 1 |
+| 0 | 1 | 1 |
+
+## 🟡 Medium Priority
+
+### `TODO` (Quotio/Views/Screens/UsageScreen.swift:317)
+
+> Show all models
 
 ## 🟢 Low Priority
 

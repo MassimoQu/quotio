@@ -69,7 +69,7 @@ Symbol maps for 3 large files in this module.
 | 1822 | fn | findPreviousVersion | (private) |
 | 1835 | fn | migrateToVersionedStorage | (internal) |
 
-## Quotio/Services/Proxy/ModelUsageTracker.swift (746 lines)
+## Quotio/Services/Proxy/ModelUsageTracker.swift (747 lines)
 
 | Line | Kind | Name | Visibility |
 | ---- | ---- | ---- | ---------- |
@@ -101,8 +101,8 @@ Symbol maps for 3 large files in this module.
 | 657 | fn | clearData | (internal) |
 | 674 | fn | formatLabel | (private) |
 | 696 | struct | ProviderUsageSummary | (internal) |
-| 710 | struct | OverallUsageStats | (internal) |
-| 721 | struct | UsageTrends | (internal) |
+| 711 | struct | OverallUsageStats | (internal) |
+| 722 | struct | UsageTrends | (internal) |
 
 ## Quotio/Services/Proxy/ProxyBridge.swift (1431 lines)
 
