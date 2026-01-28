@@ -107,7 +107,7 @@ final class CustomProviderService {
     
     /// Get all enabled providers
     var enabledProviders: [CustomProvider] {
-        providers.filter($0.isEnabled)
+        providers.filter { $0.isEnabled }
     }
     
     /// Get providers grouped by type

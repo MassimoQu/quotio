@@ -440,7 +440,7 @@ extension Array where Element == CustomProvider {
         var yaml = ""
         
         // Group by type
-        let grouped = Dictionary(grouping: self.filter($0.isEnabled), by: $0.type)
+        let grouped = Dictionary(grouping: self.filter { $0.isEnabled }, by: $0.type)
         
         // OpenAI Compatibility
         if let openaiProviders = grouped[.openaiCompatibility], !openaiProviders.isEmpty {
