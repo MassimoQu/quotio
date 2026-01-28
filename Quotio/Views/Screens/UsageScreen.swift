@@ -16,9 +16,6 @@ struct UsageScreen: View {
     
     @State private var selectedPeriod: UsageTimePeriod = .day
     @State private var selectedMetric: UsageMetricType = .requests
-    @State private var selectedProvider: String? = nil
-    @State private var isExporting = false
-    @State private var showExportSuccess = false
     
     /// Proxy running status
     private var isProxyRunning: Bool {
@@ -39,62 +36,24 @@ struct UsageScreen: View {
                     overallStatsSection
                     
                     // Usage trends chart
-                    usageTrendsSection
+                    if !usageTracker.usageDataPoints(period: selectedPeriod).isEmpty {
+                        usageTrendsSection
+                    }
                     
                     // Provider breakdown
-                    providerBreakdownSection
+                    if usageTracker.providerUsage().count > 1 {
+                        providerBreakdownSection
+                    }
                     
-                    // Model usage cards
+                    // Model usage list
                     modelUsageSection
                 }
             }
             .padding()
         }
         .navigationTitle("usage.title".localized())
-        .toolbar {
-            toolbarContent
-        }
-        .sheet(isPresented: $isExporting) {
-            ExportUsageSheet(
-                usageTracker: usageTracker,
-                requestTracker: requestTracker,
-                onDismiss: {
-                    isExporting = false
-                    showExportSuccess = true
-                }
-            )
-        }
-        .alert("usage.exportSuccess".localized(), isPresented: $showExportSuccess) {
-            Button("action.ok".localized(), role: .cancel) {}
-        } message: {
-            Text("usage.exportSuccessMessage".localized())
-        }
-    }
-    
-    // MARK: - Toolbar
-    
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                isExporting = true
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-            }
-            .help("usage.export".localized())
-            .disabled(!isProxyRunning)
-        }
-        
-        ToolbarItem(placement: .topBarLeading) {
-            Button {
-                // Refresh data
-                usageTracker.refreshData()
-                requestTracker.refreshData()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .help("usage.refresh".localized())
-            .disabled(!isProxyRunning)
+        .refreshable {
+            usageTracker.refreshData()
         }
     }
     
@@ -105,13 +64,29 @@ struct UsageScreen: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(UsageTimePeriod.allCases, id: \.self) { period in
-                    PeriodButton(
-                        period: period,
-                        isSelected: selectedPeriod == period,
-                        action: {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
                             selectedPeriod = period
                         }
-                    )
+                    } label: {
+                        Text(period.displayName)
+                            .font(.subheadline)
+                            .fontWeight(selectedPeriod == period ? .semibold : .regular)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                selectedPeriod == period 
+                                    ? Color.accentColor 
+                                    : Color(NSColor.textBackgroundColor)
+                            )
+                            .foregroundColor(
+                                selectedPeriod == period 
+                                    ? .white 
+                                    : .primary
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -134,160 +109,419 @@ struct UsageScreen: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(NSColor.controlBackgroundColor))
+        )
     }
     
     // MARK: - Overall Statistics
     
     @ViewBuilder
     private var overallStatsSection: some View {
-        Section {
-            OverallStatsGrid(stats: usageTracker.overallStats())
-        } header: {
+        let stats = usageTracker.overallStats()
+        
+        VStack(alignment: .leading, spacing: 12) {
             Label("usage.overview".localized(), systemImage: "chart.bar")
+                .font(.headline)
+                .foregroundStyle(.primary)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                StatCard(
+                    icon: "arrow.up.arrow.down",
+                    value: formatNumber(stats.totalRequests),
+                    label: "Total Requests",
+                    color: .blue
+                )
+                
+                StatCard(
+                    icon: "text.word.spacing",
+                    value: formatCompactNumber(stats.totalTokens),
+                    label: "Total Tokens",
+                    color: .green
+                )
+                
+                StatCard(
+                    icon: "exclamationmark.triangle",
+                    value: formatNumber(stats.totalFailures),
+                    label: "Failures",
+                    color: .orange
+                )
+                
+                StatCard(
+                    icon: "checkmark.circle",
+                    value: String(format: "%.1f%%", stats.successRate * 100),
+                    label: "Success Rate",
+                    color: .purple
+                )
+            }
         }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(NSColor.controlBackgroundColor))
+        )
     }
     
     // MARK: - Usage Trends
     
     @ViewBuilder
     private var usageTrendsSection: some View {
-        Section {
-            UsageTrendsCard(
-                trends: usageTracker.usageTrends(period: selectedPeriod),
-                period: selectedPeriod
-            )
-        } header: {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("usage.trends".localized(), systemImage: "chart.line")
+                    .font(.headline)
+                
                 Spacer()
-                Picker("usage.metric".localized(), selection: $selectedMetric) {
-                    Text("usage.requests".localized()).tag(UsageMetricType.requests)
-                    Text("usage.tokens".localized()).tag(UsageMetricType.tokens)
-                    Text("usage.cost".localized()).tag(UsageMetricType.cost)
+                
+                Picker("Metric", selection: $selectedMetric) {
+                    Text("Requests").tag(UsageMetricType.requests)
+                    Text("Tokens").tag(UsageMetricType.totalTokens)
+                    Text("Failures").tag(UsageMetricType.failures)
                 }
                 .pickerStyle(.menu)
-                .font(.caption)
+                .frame(width: 120)
+            }
+            
+            let points = usageTracker.chartData(period: selectedPeriod, metric: selectedMetric)
+            
+            if points.isEmpty {
+                EmptyStateView(
+                    icon: "chart.line.up.xyaxis",
+                    message: "No data for this period"
+                )
+            } else {
+                Chart(points) { point in
+                    AreaMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value(selectedMetric.displayName, point.value)
+                    )
+                    .foregroundStyle(
+                        selectedMetric.color.gradient.opacity(0.3)
+                    )
+                    
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value(selectedMetric.displayName, point.value)
+                    )
+                    .foregroundStyle(selectedMetric.color)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    
+                    PointMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value(selectedMetric.displayName, point.value)
+                    )
+                    .foregroundStyle(selectedMetric.color)
+                    .symbolSize(30)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.hour().minute())
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading) { _ in
+                        AxisGridLine()
+                        AxisValueLabel()
+                    }
+                }
+                .frame(height: 200)
             }
         }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(NSColor.controlBackgroundColor))
+        )
     }
     
     // MARK: - Provider Breakdown
     
     @ViewBuilder
     private var providerBreakdownSection: some View {
-        Section {
-            ProviderUsageBreakdownView(
-                usageTracker: usageTracker,
-                period: selectedPeriod,
-                selectedProvider: $selectedProvider
-            )
-        } header: {
-            Label("usage.byProvider".localized(), systemImage: "square.grid.2x2")
+        let providers = usageTracker.providerUsage().sorted { $0.totalRequests > $1.totalRequests }
+        let maxRequests = providers.first?.totalRequests ?? 1
+        
+        VStack(alignment: .leading, spacing: 12) {
+            Label("usage.byProvider".localized(), systemImage: "square.stack.3d.up")
+                .font(.headline)
+            
+            if providers.isEmpty {
+                EmptyStateView(
+                    icon: "square.stack.3d.up",
+                    message: "No provider data"
+                )
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(providers) { provider in
+                        ProviderRow(
+                            provider: provider,
+                            maxRequests: maxRequests,
+                            metric: selectedMetric
+                        )
+                    }
+                }
+            }
         }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(NSColor.controlBackgroundColor))
+        )
     }
     
-    // MARK: - Model Usage Cards
+    // MARK: - Model Usage
     
     @ViewBuilder
     private var modelUsageSection: some View {
-        Section {
-            LazyVStack(spacing: 12) {
-                ForEach(usageTracker.topModels(by: selectedMetric, limit: 10, period: selectedPeriod)) { modelData in
-                    ModelUsageCard(
-                        usageData: modelData,
-                        chartData: usageTracker.chartData(for: modelData.modelId, provider: modelData.provider, period: selectedPeriod, metric: selectedMetric)
-                    )
-                }
-            }
-        } header: {
+        let topModels = usageTracker.topModels(by: selectedMetric, limit: 10, period: selectedPeriod)
+        
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("usage.byModel".localized(), systemImage: "list.bullet")
+                    .font(.headline)
+                
                 Spacer()
-                Text("usage.topModels".localized())
+                
+                Text("\(topModels.count) models")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        } footer: {
-            Text("usage.modelUsageFooter".localized())
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            
+            if topModels.isEmpty {
+                EmptyStateView(
+                    icon: "list.bullet",
+                    message: "No model usage data"
+                )
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(topModels.prefix(5)) { model in
+                        ModelRow(
+                            model: model,
+                            metric: selectedMetric
+                        )
+                    }
+                    
+                    if topModels.count > 5 {
+                        Button {
+                            // TODO: Show all models
+                        } label: {
+                            Text("usage.viewAll".localized())
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
         }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(NSColor.controlBackgroundColor))
+        )
     }
-}
-
-// MARK: - Period Button
-
-struct PeriodButton: View {
-    let period: UsageTimePeriod
-    let isSelected: Bool
-    let action: () -> Void
     
-    var body: some View {
-        Button(action: action) {
-            Text(period.displayName)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.1))
-                .foregroundStyle(isSelected ? .white : .primary)
-                .clipShape(Capsule())
+    // MARK: - Helpers
+    
+    private func formatNumber(_ number: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: number)) ?? "\(number)"
+    }
+    
+    private func formatCompactNumber(_ number: Int) -> String {
+        if number >= 1_000_000 {
+            return String(format: "%.1fM", Double(number) / 1_000_000)
+        } else if number >= 1_000 {
+            return String(format: "%.1fK", Double(number) / 1_000)
+        } else {
+            return "\(number)"
         }
-        .buttonStyle(.plain)
     }
 }
 
-// MARK: - Stat Card
+// MARK: - Supporting Views
 
 struct StatCard: View {
-    let title: String
-    let value: String
     let icon: String
+    let value: String
+    let label: String
     let color: Color
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundStyle(color)
-                Spacer()
-            }
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(color)
             
             Text(value)
-                .font(.title2)
+                .font(.title3)
                 .fontWeight(.bold)
-                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             
-            Text(title)
+            Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
-        .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(color.opacity(0.1))
+        )
     }
 }
 
-// MARK: - Model Usage Card
-
-extension UsageMetricType {
-    var displayName: String {
-        switch self {
-        case .requests: return "usage.metricRequests".localized()
-        case .tokens: return "usage.metricTokens".localized()
-        case .cost: return "usage.metricCost".localized()
+struct ProviderRow: View {
+    let provider: ProviderUsageSummary
+    let maxRequests: Int
+    let metric: UsageMetricType
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text(provider.provider)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                Text(formatNumber(provider.totalRequests))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let progress = CGFloat(provider.totalRequests) / CGFloat(maxRequests)
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.accentColor.opacity(0.2))
+                    .frame(width: width)
+                    .overlay(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.accentColor)
+                            .frame(width: width * progress)
+                    }
+            }
+            .frame(height: 8)
         }
+        .padding(.vertical, 4)
+    }
+    
+    private func formatNumber(_ number: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: number)) ?? "\(number)"
+    }
+}
+
+struct ModelRow: View {
+    let model: ModelUsageData
+    let metric: UsageMetricType
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.modelId)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                Text(model.provider)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(metricValue)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                
+                Text(metricLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(NSColor.textBackgroundColor))
+        )
+    }
+    
+    private var metricValue: String {
+        switch metric {
+        case .requests:
+            return "\(model.totalRequests)"
+        case .totalTokens, .inputTokens, .outputTokens:
+            let tokens = model.totalInputTokens + model.totalOutputTokens
+            if tokens >= 1_000_000 {
+                return String(format: "%.1fM", Double(tokens) / 1_000_000)
+            } else if tokens >= 1_000 {
+                return String(format: "%.1fK", Double(tokens) / 1_000)
+            } else {
+                return "\(tokens)"
+            }
+        case .failures:
+            return "\(model.totalFailures)"
+        default:
+            return "\(model.totalRequests)"
+        }
+    }
+    
+    private var metricLabel: String {
+        switch metric {
+        case .requests:
+            return "requests"
+        case .totalTokens, .inputTokens, .outputTokens:
+            return "tokens"
+        case .failures:
+            return "failures"
+        default:
+            return ""
+        }
+    }
+}
+
+struct EmptyStateView: View {
+    let icon: String
+    let message: String
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
     }
 }
 
 #Preview {
     NavigationStack {
         UsageScreen()
-            .environment(QuotaViewModel())
     }
+    .environment(QuotaViewModel())
 }
