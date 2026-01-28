@@ -30,21 +30,21 @@ Symbol maps for 7 large files in this module.
 | 356 | struct | VirtualModelRow | (internal) |
 | 474 | struct | FallbackEntryRow | (internal) |
 
-## Quotio/Views/Screens/LogsScreen.swift (521 lines)
+## Quotio/Views/Screens/LogsScreen.swift (519 lines)
 
 | Line | Kind | Name | Visibility |
 | ---- | ---- | ---- | ---------- |
 | 10 | struct | LogsScreen | (internal) |
-| 229 | fn | calculateStats | (private) |
-| 244 | fn | formatTokens | (private) |
-| 274 | struct | LogsRequestStats | (internal) |
-| 282 | struct | StatItem | (internal) |
-| 305 | struct | RequestRow | (internal) |
-| 351 | struct | RequestDetailSheet | (internal) |
-| 420 | fn | formatBytes | (private) |
-| 432 | struct | DetailRow | (internal) |
-| 449 | struct | LogsListView | (internal) |
-| 471 | struct | LogRow | (internal) |
+| 227 | fn | calculateStats | (private) |
+| 242 | fn | formatTokens | (private) |
+| 272 | struct | LogsRequestStats | (internal) |
+| 280 | struct | StatItem | (internal) |
+| 303 | struct | RequestRow | (internal) |
+| 349 | struct | RequestDetailSheet | (internal) |
+| 418 | fn | formatBytes | (private) |
+| 430 | struct | DetailRow | (internal) |
+| 447 | struct | LogsListView | (internal) |
+| 469 | struct | LogRow | (internal) |
 
 ## Quotio/Views/Screens/ProvidersScreen.swift (973 lines)
 
