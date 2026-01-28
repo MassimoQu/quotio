@@ -173,13 +173,13 @@ final class ProxyRequestTracker {
     /// Get provider breakdown
     func providerBreakdown() -> [String: Int] {
         Dictionary(grouping: recentRequests, by: $0.provider)
-            .mapValues($0.count)
+            .mapValues { $0.count }
     }
     
     /// Get model breakdown
     func modelBreakdown() -> [String: Int] {
         Dictionary(grouping: recentRequests, by: $0.model)
-            .mapValues($0.count)
+            .mapValues { $0.count }
             .sorted { $0.value > $1.value }
     }
     

@@ -770,7 +770,7 @@ final class QuotaViewModel {
             // Warmup not supported for this provider; no log.
             return
         }
-        let availableIds = availableModels.map(\$0.id)
+        let availableIds = availableModels.map { $0.id }
         let selectedModels = warmupSettings.selectedModels(provider: provider, accountKey: accountKey)
         let models = selectedModels.filter { availableIds.contains($0) }
         guard !models.isEmpty else {
@@ -854,7 +854,7 @@ final class QuotaViewModel {
             authFileName: authInfo.authFileName,
             apiClient: apiClient
         )
-        return models.map(\$0.id).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        return models.map { $0.id }.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     private func warmupAuthInfo(provider: AIProvider, accountKey: String) -> (authIndex: String, authFileName: String)? {
@@ -1606,7 +1606,7 @@ final class QuotaViewModel {
                 guard !quotaData.models.isEmpty else { continue }
                 
                 // Filter out models with unknown percentage (-1 means unavailable/unknown)
-                let validPercentages = quotaData.models.map(\$0.percentage).filter { $0 >= 0 }
+                let validPercentages = quotaData.models.map { $0.percentage }.filter { $0 >= 0 }
                 guard !validPercentages.isEmpty else { continue }
                 
                 let minRemainingPercent = validPercentages.min() ?? 100.0
@@ -1761,7 +1761,7 @@ final class QuotaViewModel {
                let quotaData = accountQuotas[selectedItem.accountKey],
                !quotaData.models.isEmpty {
                 // Filter out -1 (unknown) percentages when calculating lowest
-                let validPercentages = quotaData.models.map(\$0.percentage).filter { $0 >= 0 }
+                let validPercentages = quotaData.models.map { $0.percentage }.filter { $0 >= 0 }
                 let lowestPercent = validPercentages.min() ?? (quotaData.models.first?.percentage ?? -1)
                 items.append(MenuBarQuotaDisplayItem(
                     id: selectedItem.id,
