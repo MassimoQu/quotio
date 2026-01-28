@@ -374,10 +374,8 @@ struct RoutingEfficiencyReport {
 // MARK: - Codable Extensions
 
 extension SmartRoutingConfiguration {
-    private static let configKey = "quotio.smartRouting.config"
-    
     static func load() -> SmartRoutingConfiguration {
-        guard let data = UserDefaults.standard.data(forKey: configKey),
+        guard let data = UserDefaults.standard.data(forKey: "quotio.smartRouting.config"),
               let config = try? JSONDecoder().decode(SmartRoutingConfiguration.self, from: data) else {
             return SmartRoutingConfiguration()
         }
@@ -386,16 +384,14 @@ extension SmartRoutingConfiguration {
     
     func save() {
         if let data = try? JSONEncoder().encode(self) {
-            UserDefaults.standard.set(data, forKey: configKey)
+            UserDefaults.standard.set(data, forKey: "quotio.smartRouting.config")
         }
     }
 }
 
 extension SmartRoutingStats {
-    private static let statsKey = "quotio.smartRouting.stats"
-    
     static func load() -> SmartRoutingStats {
-        guard let data = UserDefaults.standard.data(forKey: statsKey),
+        guard let data = UserDefaults.standard.data(forKey: "quotio.smartRouting.stats"),
               let stats = try? JSONDecoder().decode(SmartRoutingStats.self, from: data) else {
             return SmartRoutingStats()
         }
@@ -404,7 +400,7 @@ extension SmartRoutingStats {
     
     func save() {
         if let data = try? JSONEncoder().encode(self) {
-            UserDefaults.standard.set(data, forKey: statsKey)
+            UserDefaults.standard.set(data, forKey: "quotio.smartRouting.stats")
         }
     }
 }

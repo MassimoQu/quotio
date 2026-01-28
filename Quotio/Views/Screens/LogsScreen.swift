@@ -227,13 +227,13 @@ struct LogsScreen: View {
         return requests
     }
     
-    private func calculateStats() -> RequestStats {
+    private func calculateStats() -> LogsRequestStats {
         let requests = filteredRequests
         let successful = requests.filter { $0.success }
         let totalTokens = requests.reduce(0) { $0 + ($1.tokens?.total ?? 0) }
         let totalLatency = requests.reduce(0) { $0 + $1.latencyMs }
         
-        return RequestStats(
+        return LogsRequestStats(
             totalRequests: requests.count,
             successRate: requests.isEmpty ? 0 : Double(successful.count) / Double(requests.count),
             totalTokens: totalTokens,
@@ -271,7 +271,7 @@ struct LogsScreen: View {
 
 // MARK: - Supporting Types
 
-struct RequestStats {
+struct LogsRequestStats {
     let totalRequests: Int
     let successRate: Double
     let totalTokens: Int
@@ -506,7 +506,7 @@ struct LogRow: View {
         switch entry.level {
         case .debug: return .gray
         case .info: return .blue
-        case .warning: return .orange
+        case .warn: return .orange
         case .error: return .red
         }
     }
