@@ -11,8 +11,8 @@ import Charts
 
 struct UsageScreen: View {
     @Environment(QuotaViewModel.self) private var viewModel
-    @StateObject private var usageTracker = ModelUsageTracker.shared
-    @StateObject private var requestTracker = ProxyRequestTracker.shared
+    @Bindable private var usageTracker = ModelUsageTracker.shared
+    @Bindable private var requestTracker = ProxyRequestTracker.shared
     
     @State private var selectedPeriod: UsageTimePeriod = .day
     @State private var selectedMetric: UsageMetricType = .requests
@@ -144,11 +144,7 @@ struct UsageScreen: View {
     @ViewBuilder
     private var overallStatsSection: some View {
         Section {
-            OverallStatsGrid(
-                usageTracker: usageTracker,
-                requestTracker: requestTracker,
-                period: selectedPeriod
-            )
+            OverallStatsGrid(stats: usageTracker.overallStats())
         } header: {
             Label("usage.overview".localized(), systemImage: "chart.bar")
         }
@@ -160,9 +156,8 @@ struct UsageScreen: View {
     private var usageTrendsSection: some View {
         Section {
             UsageTrendsCard(
-                usageTracker: usageTracker,
-                period: selectedPeriod,
-                metric: selectedMetric
+                trends: usageTracker.usageTrends(period: selectedPeriod),
+                period: selectedPeriod
             )
         } header: {
             HStack {
@@ -200,11 +195,10 @@ struct UsageScreen: View {
     private var modelUsageSection: some View {
         Section {
             LazyVStack(spacing: 12) {
-                ForEach(usageTracker.topModels(limit: 10, period: selectedPeriod)) { modelData in
+                ForEach(usageTracker.topModels(by: selectedMetric, limit: 10, period: selectedPeriod)) { modelData in
                     ModelUsageCard(
-                        modelData: modelData,
-                        usageTracker: usageTracker,
-                        period: selectedPeriod
+                        usageData: modelData,
+                        chartData: usageTracker.chartData(for: modelData.modelId, provider: modelData.provider, period: selectedPeriod, metric: selectedMetric)
                     )
                 }
             }

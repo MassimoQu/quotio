@@ -237,7 +237,7 @@ struct ModelUsageCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack {
-                ProviderIcon(provider: AIProvider(rawValue: usageData.provider) ?? .openai, size: 24)
+                ProviderIcon(provider: AIProvider(rawValue: usageData.provider) ?? .claude, size: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(usageData.modelId)
@@ -623,7 +623,7 @@ struct MultiModelComparisonChart: View {
                         x: .value("Model", model.modelId),
                         y: .value(selectedMetric.displayName, metricValue(for: model, metric: selectedMetric))
                     )
-                    .foregroundStyle((AIProvider(rawValue: model.provider) ?? .openai).color.gradient)
+                    .foregroundStyle((AIProvider(rawValue: model.provider) ?? .claude).color.gradient)
                     .cornerRadius(4)
                 }
                 .frame(height: CGFloat(models.count * 40 + 50))
@@ -705,9 +705,9 @@ struct MultiModelComparisonChart: View {
             )
             
             MultiModelComparisonChart(models: [
-                ModelUsageData(modelId: "gpt-4", provider: "openai", totalRequests: 5000, totalTokens: 15000000, totalFailures: 50),
-                ModelUsageData(modelId: "claude-3-opus", provider: "anthropic", totalRequests: 3500, totalTokens: 12000000, totalFailures: 30),
-                ModelUsageData(modelId: "gemini-pro", provider: "google", totalRequests: 2000, totalTokens: 8000000, totalFailures: 40)
+                ModelUsageData(modelId: "gpt-4", provider: "openai", totalRequests: 5000, totalInputTokens: 10000000, totalOutputTokens: 5000000, totalFailures: 50),
+                ModelUsageData(modelId: "claude-3-opus", provider: "anthropic", totalRequests: 3500, totalInputTokens: 8000000, totalOutputTokens: 4000000, totalFailures: 30),
+                ModelUsageData(modelId: "gemini-pro", provider: "google", totalRequests: 2000, totalInputTokens: 5000000, totalOutputTokens: 3000000, totalFailures: 40)
             ])
         }
         .padding()

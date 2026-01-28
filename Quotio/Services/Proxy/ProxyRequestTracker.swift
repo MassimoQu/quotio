@@ -177,10 +177,11 @@ final class ProxyRequestTracker {
     }
     
     /// Get model breakdown
-    func modelBreakdown() -> [String: Int] {
+    func modelBreakdown() -> [(model: String, count: Int)] {
         Dictionary(grouping: recentRequests) { $0.model }
             .mapValues { $0.count }
             .sorted { $0.value > $1.value }
+            .map { (model: $0.key, count: $0.value) }
     }
     
     /// Get average latency by provider
