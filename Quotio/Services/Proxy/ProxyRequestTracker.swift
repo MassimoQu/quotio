@@ -196,6 +196,19 @@ final class ProxyRequestTracker {
             Double(values.reduce(0, +)) / Double(values.count)
         }
     }
+    
+    /// Clear recent request history
+    func clearHistory() {
+        recentRequests.removeAll()
+        sessionRequests = 0
+        sessionStartTime = Date()
+    }
+    
+    /// Refresh tracking data
+    func refreshData() {
+        // Trigger any necessary data refreshes
+        // This is a placeholder for any refresh logic needed
+    }
 }
 
 // MARK: - Tracked Request
