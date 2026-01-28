@@ -28,8 +28,8 @@ Follow this protocol to understand the codebase efficiently:
 
 ## Freshness Check
 
-**Generated:** 2026-01-28T08:07:13Z
-**Git HEAD:** `8eaaaee`
+**Generated:** 2026-01-28T08:13:29Z
+**Git HEAD:** `abbadbc`
 
 ### How to verify freshness
 
